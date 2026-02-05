@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BetGenius AI - Smart Sports Betting Assistant</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <i class="fas fa-brain fa-spin"></i>
+            <p>Loading live data...</p>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <i class="fas fa-brain"></i>
+                <span>BetGenius<span class="ai-badge">AI</span></span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#dashboard" class="active" data-page="dashboard"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+                <li><a href="#odds" data-page="odds"><i class="fas fa-balance-scale"></i> Best Odds</a></li>
+                <li><a href="#props" data-page="props"><i class="fas fa-user"></i> Player Props</a></li>
+                <li><a href="#predictions" data-page="predictions"><i class="fas fa-brain"></i> Predictions</a></li>
+                <li><a href="#live" data-page="live"><i class="fas fa-broadcast-tower"></i> Live</a></li>
+            </ul>
+            <div class="nav-actions">
+                <button class="btn btn-icon" id="refreshBtn" title="Refresh Data">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="theme-toggle" id="themeToggle">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Sports Filter Bar -->
+        <div class="sports-filter">
+            <div class="filter-container">
+                <button class="sport-btn active" data-sport="all">
+                    <i class="fas fa-trophy"></i> <span>All</span>
+                </button>
+                <button class="sport-btn" data-sport="nba">
+                    <i class="fas fa-basketball-ball"></i> <span>NBA</span>
+                </button>
+                <button class="sport-btn" data-sport="nfl">
+                    <i class="fas fa-football-ball"></i> <span>NFL</span>
+                </button>
+                <button class="sport-btn" data-sport="mlb">
+                    <i class="fas fa-baseball-ball"></i> <span>MLB</span>
+                </button>
+                <button class="sport-btn" data-sport="nhl">
+                    <i class="fas fa-hockey-puck"></i> <span>NHL</span>
+                </button>
+                <button class="sport-btn" data-sport="ncaab">
+                    <i class="fas fa-basketball-ball"></i> <span>NCAAB</span>
+                </button>
+                <button class="sport-btn" data-sport="ncaaf">
+                    <i class="fas fa-football-ball"></i> <span>NCAAF</span>
+                </button>
+                <button class="sport-btn" data-sport="soccer">
+                    <i class="fas fa-futbol"></i> <span>Soccer</span>
+                </button>
+                <button class="sport-btn" data-sport="mma">
+                    <i class="fas fa-fist-raised"></i> <span>MMA</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Betting App Filter Bar -->
+        <div class="betting-app-filter">
+            <div class="filter-container">
+                <span class="filter-label">Filter by App:</span>
+                <button class="app-btn active" data-app="all">All Apps</button>
+                <button class="app-btn prizepicks" data-app="prizepicks">PrizePicks</button>
+                <button class="app-btn draftkings" data-app="draftkings">DraftKings</button>
+                <button class="app-btn fanduel" data-app="fanduel">FanDuel</button>
+                <button class="app-btn sleeper" data-app="sleeper">Sleeper</button>
+                <button class="app-btn underdog" data-app="underdog">Underdog</button>
+                <button class="app-btn betr" data-app="betr">Betr</button>
+            </div>
+        </div>
+
+        <!-- Dashboard Page -->
+        <section id="dashboard" class="page active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="fas fa-chart-line"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="aiAccuracy">73.2%</span>
+                        <span class="stat-label">AI Accuracy</span>
+                    </div>
+                    <div class="stat-trend up"><i class="fas fa-arrow-up"></i> +2.4%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="fas fa-calendar-day"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="gamesToday">--</span>
+                        <span class="stat-label">Games Today</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon purple"><i class="fas fa-fire"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="hotPicks">--</span>
+                        <span class="stat-label">Hot Picks</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange"><i class="fas fa-bolt"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="liveGamesCount">--</span>
+                        <span class="stat-label">Live Now</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data-source-banner" id="dataSourceBanner">
+                <i class="fas fa-signal"></i>
+                <span id="dataSourceText">Live data from ESPN & The Odds API</span>
+                <span class="last-update">Updated: <span id="lastUpdateTime">--</span></span>
+            </div>
+
+            <div class="ai-insights-banner">
+                <div class="ai-icon"><i class="fas fa-robot"></i></div>
+                <div class="ai-message">
+                    <h3>AI Insight</h3>
+                    <p id="aiInsightText">Analyzing trends across all betting platforms...</p>
+                </div>
+                <button class="btn btn-outline" id="refreshInsight"><i class="fas fa-sync-alt"></i> Refresh</button>
+            </div>
+
+            <div class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-star"></i> Top AI Picks</h2>
+                    <a href="#" class="view-all" data-page="predictions">View All <i class="fas fa-arrow-right"></i></a>
+                </div>
+                <div class="picks-grid" id="topPicks"></div>
+            </div>
+
+            <div class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-clock"></i> Upcoming Games</h2>
+                    <div class="time-filter">
+                        <button class="time-btn active" data-time="today">Today</button>
+                        <button class="time-btn" data-time="tomorrow">Tomorrow</button>
+                    </div>
+                </div>
+                <div class="games-list" id="upcomingGames"></div>
+            </div>
+        </section>
+
+        <!-- Best Odds Page -->
+        <section id="odds" class="page">
+            <div class="page-header">
+                <h1><i class="fas fa-balance-scale"></i> Best Odds Comparison</h1>
+                <p>Real-time odds from DraftKings, FanDuel, BetMGM, Caesars & more</p>
+            </div>
+            <div class="odds-filters">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search teams..." id="oddsSearch">
+                </div>
+                <select class="filter-select" id="betTypeFilter">
+                    <option value="all">All Bet Types</option>
+                    <option value="spreads">Spread</option>
+                    <option value="h2h">Moneyline</option>
+                    <option value="totals">Over/Under</option>
+                </select>
+            </div>
+            <div class="odds-table-container">
+                <table class="odds-table" id="oddsTable">
+                    <thead>
+                        <tr>
+                            <th>Game</th>
+                            <th>Type</th>
+                            <th class="book-col">DraftKings</th>
+                            <th class="book-col">FanDuel</th>
+                            <th class="book-col">BetMGM</th>
+                            <th class="book-col">Caesars</th>
+                            <th>Best</th>
+                        </tr>
+                    </thead>
+                    <tbody id="oddsTableBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Player Props Page -->
+        <section id="props" class="page">
+            <div class="page-header">
+                <h1><i class="fas fa-user"></i> Player Props</h1>
+                <p>Compare lines across PrizePicks, Underdog, Sleeper, DraftKings & more</p>
+            </div>
+            <div class="props-app-tabs">
+                <button class="prop-app-tab active" data-app="all">All Apps</button>
+                <button class="prop-app-tab" data-app="prizepicks">PrizePicks</button>
+                <button class="prop-app-tab" data-app="underdog">Underdog</button>
+                <button class="prop-app-tab" data-app="sleeper">Sleeper</button>
+                <button class="prop-app-tab" data-app="betr">Betr</button>
+                <button class="prop-app-tab" data-app="draftkings">DraftKings</button>
+                <button class="prop-app-tab" data-app="fanduel">FanDuel</button>
+            </div>
+            <div class="props-filters">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search players..." id="playerSearch">
+                </div>
+                <select class="filter-select" id="propTypeFilter">
+                    <option value="all">All Props</option>
+                    <option value="points">Points</option>
+                    <option value="rebounds">Rebounds</option>
+                    <option value="assists">Assists</option>
+                    <option value="threes">3-Pointers</option>
+                    <option value="pass_yds">Pass Yards</option>
+                    <option value="rush_yds">Rush Yards</option>
+                    <option value="rec_yds">Rec Yards</option>
+                </select>
+            </div>
+            <div class="props-grid" id="playerProps"></div>
+        </section>
+
+        <!-- Predictions Page -->
+        <section id="predictions" class="page">
+            <div class="page-header">
+                <h1><i class="fas fa-brain"></i> AI Game Predictions</h1>
+                <p>ML models analyze historical data, matchups, and real-time odds</p>
+            </div>
+            <div class="predictions-filters">
+                <div class="confidence-filter">
+                    <label>Min Confidence:</label>
+                    <input type="range" min="50" max="95" value="60" id="confidenceSlider">
+                    <span id="confidenceValue">60%</span>
+                </div>
+            </div>
+            <div class="predictions-list" id="predictionsList"></div>
+        </section>
+
+        <!-- Live Page -->
+        <section id="live" class="page">
+            <div class="page-header">
+                <h1><i class="fas fa-broadcast-tower"></i> Live Games</h1>
+                <p>Real-time scores and live odds updates</p>
+            </div>
+            <div class="live-controls">
+                <label class="auto-refresh">
+                    <input type="checkbox" id="autoRefresh" checked>
+                    <span>Auto-refresh (30s)</span>
+                </label>
+                <button class="btn btn-outline" id="refreshLive"><i class="fas fa-sync-alt"></i> Refresh</button>
+            </div>
+            <div class="live-games-grid" id="liveGames"></div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>BetGenius AI</h4>
+                <p>AI-powered sports betting assistant with real-time data.</p>
+            </div>
+            <div class="footer-section">
+                <h4>Supported Apps</h4>
+                <div class="supported-apps">
+                    <span class="app-badge prizepicks">PrizePicks</span>
+                    <span class="app-badge draftkings">DraftKings</span>
+                    <span class="app-badge fanduel">FanDuel</span>
+                    <span class="app-badge sleeper">Sleeper</span>
+                    <span class="app-badge underdog">Underdog</span>
+                    <span class="app-badge betr">Betr</span>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h4>Legal</h4>
+                <p class="disclaimer">For entertainment only. Gamble responsibly. 21+</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 BetGenius AI. Data from ESPN & The Odds API.</p>
+        </div>
+    </footer>
+
+    <script src="js/api.js"></script>
+    <script src="js/liveData.js"></script>
+    <script src="js/roster.js"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

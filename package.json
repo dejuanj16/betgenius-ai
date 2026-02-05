@@ -1,0 +1,13 @@
+{
+  "name": "betgenius-ai",
+  "version": "1.0.0",
+  "description": "BetGenius AI - Sports Betting Assistant with Live Data",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "server": "node server.js"
+  },
+  "keywords": ["sports", "betting", "ai", "odds", "nba", "nfl"],
+  "author": "",
+  "license": "MIT"
+}
