@@ -204,37 +204,71 @@ async function fetchEvents(sport) {
 async function fetchPlayerProps(sport) {
     const sportKeys = {
         'nba': 'basketball_nba',
-        'nfl': 'americanfootball_nfl'
+        'nfl': 'americanfootball_nfl',
+        'nhl': 'icehockey_nhl',
+        'mlb': 'baseball_mlb'
     };
 
+    // Core prop markets (reduced to save API calls)
     const propMarkets = {
-        'nba': 'player_points,player_rebounds,player_assists,player_threes',
-        'nfl': 'player_pass_yds,player_rush_yds,player_reception_yds,player_anytime_td'
+        'nba': 'player_points,player_rebounds,player_assists,player_threes,player_points_rebounds_assists',
+        'nfl': 'player_pass_yds,player_rush_yds,player_reception_yds,player_anytime_td,player_receptions',
+        'nhl': 'player_points,player_goals,player_assists,player_shots_on_goal',
+        'mlb': 'batter_hits,batter_total_bases,pitcher_strikeouts,batter_home_runs'
     };
 
     const sportKey = sportKeys[sport] || sport;
-    const markets = propMarkets[sport] || '';
+    const markets = propMarkets[sport] || propMarkets['nba'];
 
-    // First get events
+    // Check cache first (5 minute cache for props)
+    const cacheKey = `props_${sport}`;
+    if (propsCache[cacheKey] && (Date.now() - propsCache[cacheKey].timestamp < 300000)) {
+        console.log(`📦 Returning cached props for ${sport.toUpperCase()}`);
+        return propsCache[cacheKey].data;
+    }
+
+    // First get all events
     const events = await fetchEvents(sport);
     if (!events || !events.length) return [];
 
-    // Get props for first 3 events
+    console.log(`📋 Found ${events.length} ${sport.toUpperCase()} events, fetching props...`);
+
+    // Get props for up to 5 events (balance between coverage and API usage)
+    const maxEvents = Math.min(events.length, 5);
     const allProps = [];
-    for (const event of events.slice(0, 3)) {
+
+    for (let i = 0; i < maxEvents; i++) {
+        const event = events[i];
         const apiUrl = `https://api.the-odds-api.com/v4/sports/${sportKey}/events/${event.id}/odds?apiKey=${ODDS_API_KEY}&regions=us&markets=${markets}&oddsFormat=american`;
         try {
             const data = await fetchJSON(apiUrl);
-            if (data && data.bookmakers) {
+            if (data && data.bookmakers && data.bookmakers.length > 0) {
+                // Count players in this event
+                let playerCount = 0;
+                data.bookmakers.forEach(book => {
+                    book.markets?.forEach(market => {
+                        const uniquePlayers = new Set(market.outcomes?.map(o => o.description).filter(Boolean));
+                        playerCount = Math.max(playerCount, uniquePlayers.size);
+                    });
+                });
+                console.log(`  ✅ ${event.away_team} @ ${event.home_team}: ${playerCount} players`);
                 allProps.push({ event, odds: data });
             }
         } catch (e) {
-            console.log(`Skipping event ${event.id}`);
+            console.log(`  ⚠️ Skipping ${event.away_team} @ ${event.home_team}: ${e.message}`);
+            // Stop if rate limited
+            if (e.message.includes('Rate limit')) break;
         }
     }
 
+    // Cache the results
+    propsCache[cacheKey] = { data: allProps, timestamp: Date.now() };
+    console.log(`📊 Total: ${allProps.length} events with player props (cached for 5 min)`);
     return allProps;
 }
+
+// Props cache
+const propsCache = {};
 
 // Fetch ESPN Scores
 async function fetchESPNScores(sport) {

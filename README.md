@@ -35,7 +35,7 @@ BetGenius AI is a sports betting assistant that provides 100% accurate, real-tim
    ```bash
    cp .env.example .env
    ```
-   
+
    Edit `.env` and add your API key:
    ```
    ODDS_API_KEY=your_api_key_here
@@ -46,7 +46,7 @@ BetGenius AI is a sports betting assistant that provides 100% accurate, real-tim
    ```bash
    node server.js
    ```
-   
+
    You should see:
    ```
    ╔════════════════════════════════════════════════════════╗
@@ -57,12 +57,12 @@ BetGenius AI is a sports betting assistant that provides 100% accurate, real-tim
    ```
 
 4. **Open the app**
-   
+
    Open `index.html` in your browser, or serve it with any HTTP server:
    ```bash
    # Using Python
    python3 -m http.server 8080
-   
+
    # Using Node.js
    npx serve .
    ```
