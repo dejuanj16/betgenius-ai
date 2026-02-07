@@ -9,6 +9,20 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Data Source Status Banner -->
+    <div class="data-source-banner" id="dataSourceBanner" style="display: none;">
+        <div class="banner-content">
+            <i class="fas fa-info-circle"></i>
+            <span id="bannerMessage">Some data sources are limited</span>
+            <button class="banner-close" onclick="this.parentElement.parentElement.style.display='none'">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner">

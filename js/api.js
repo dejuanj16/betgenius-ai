@@ -3,10 +3,109 @@
 // Real-time sports data integration with enhanced accuracy
 // =====================================================
 
+// =====================================================
+// Toast Notification System
+// =====================================================
+const ToastManager = {
+    container: null,
+
+    init() {
+        this.container = document.getElementById('toastContainer');
+        if (!this.container) {
+            this.container = document.createElement('div');
+            this.container.id = 'toastContainer';
+            this.container.className = 'toast-container';
+            document.body.appendChild(this.container);
+        }
+    },
+
+    show(type, title, message, duration = 5000) {
+        if (!this.container) this.init();
+
+        const icons = {
+            success: 'fa-check-circle',
+            warning: 'fa-exclamation-triangle',
+            error: 'fa-times-circle',
+            info: 'fa-info-circle'
+        };
+
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <i class="fas ${icons[type]} toast-icon"></i>
+            <div class="toast-content">
+                <div class="toast-title">${title}</div>
+                <div class="toast-message">${message}</div>
+            </div>
+            <button class="toast-close" onclick="this.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+
+        this.container.appendChild(toast);
+
+        // Auto remove after duration
+        if (duration > 0) {
+            setTimeout(() => {
+                toast.classList.add('fade-out');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        return toast;
+    },
+
+    success(title, message) { return this.show('success', title, message); },
+    warning(title, message) { return this.show('warning', title, message, 8000); },
+    error(title, message) { return this.show('error', title, message, 10000); },
+    info(title, message) { return this.show('info', title, message); }
+};
+
+// =====================================================
+// Data Source Banner Manager
+// =====================================================
+const DataSourceBanner = {
+    banner: null,
+    messageEl: null,
+
+    init() {
+        this.banner = document.getElementById('dataSourceBanner');
+        this.messageEl = document.getElementById('bannerMessage');
+    },
+
+    show(message, type = 'warning') {
+        if (!this.banner) this.init();
+        if (!this.banner) return;
+
+        this.banner.className = `data-source-banner banner-${type}`;
+        this.messageEl.textContent = message;
+        this.banner.style.display = 'block';
+    },
+
+    hide() {
+        if (this.banner) this.banner.style.display = 'none';
+    },
+
+    showRateLimited() {
+        this.show('⚠️ Betting odds API rate limited. Showing live scores & player data from ESPN.', 'warning');
+    },
+
+    showAllLive() {
+        this.show('✅ All data sources connected and live!', 'success');
+        setTimeout(() => this.hide(), 5000);
+    }
+};
+
+// Make available globally
+window.ToastManager = ToastManager;
+window.DataSourceBanner = DataSourceBanner;
+
 // API Configuration
 const API_CONFIG = {
-    // The Odds API - Live odds from US sportsbooks
-    ODDS_API_KEY: 'e5d6211fa20d43c92494ebf902c7f41c',
+    // Proxy server for API calls (bypasses CORS)
+    PROXY_BASE: 'http://localhost:3001',
+
+    // Direct Odds API (used by proxy server, NOT browser)
     ODDS_API_BASE: 'https://api.the-odds-api.com/v4',
 
     // ESPN API (Free, no key required)
@@ -155,8 +254,10 @@ const cache = new Map();
 // =====================================================
 class SportsAPIService {
     constructor() {
-        this.oddsApiKey = API_CONFIG.ODDS_API_KEY;
-        this.isDemo = this.oddsApiKey === 'YOUR_API_KEY_HERE';
+        // API key is now handled by the proxy server
+        this.proxyBase = API_CONFIG.PROXY_BASE;
+        this.isDemo = false; // Use proxy for real data
+        this.aggregatedData = {}; // Store aggregated data by sport
     }
 
     // Check if cached data is still valid
@@ -178,6 +279,186 @@ class SportsAPIService {
             data,
             timestamp: Date.now()
         });
+    }
+
+    // =====================================================
+    // Aggregated Data - Fetches from ALL API sources at once
+    // =====================================================
+
+    async fetchAggregatedData(sport) {
+        const cacheKey = `aggregate_${sport}`;
+
+        if (this.isCacheValid(cacheKey)) {
+            console.log(`📦 Using cached aggregate data for ${sport}`);
+            return this.getCached(cacheKey);
+        }
+
+        try {
+            console.log(`🔄 Fetching aggregated data for ${sport}...`);
+            const url = `${this.proxyBase}/api/aggregate/${sport}`;
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                throw new Error(`Aggregate API Error: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Store in cache and class property
+            this.setCache(cacheKey, data);
+            this.aggregatedData[sport] = data;
+
+            // Check for rate-limited or errored sources
+            this.handleDataSourceStatus(data.sources, sport);
+
+            console.log(`✅ Aggregated data loaded:`, {
+                games: data.data?.games?.length || 0,
+                players: data.data?.players?.length || 0,
+                teams: data.data?.teams?.length || 0,
+                sources: Object.keys(data.sources || {})
+            });
+
+            return data;
+        } catch (error) {
+            console.error('Error fetching aggregated data:', error);
+
+            // Show error toast
+            if (window.ToastManager) {
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    window.ToastManager.error(
+                        'Connection Error',
+                        'Cannot connect to data server. Make sure the proxy server is running on port 3001.'
+                    );
+                } else {
+                    window.ToastManager.error(
+                        'Data Error',
+                        `Failed to load ${sport.toUpperCase()} data: ${error.message}`
+                    );
+                }
+            }
+
+            return { error: error.message, data: {}, sources: {} };
+        }
+    }
+
+    // Handle data source status and show appropriate notifications
+    handleDataSourceStatus(sources, sport) {
+        if (!sources) return;
+
+        const rateLimited = [];
+        const errored = [];
+        const successful = [];
+
+        Object.entries(sources).forEach(([source, status]) => {
+            if (status.status === 'success') {
+                successful.push(source);
+            } else if (status.status === 'error') {
+                if (status.message?.includes('Rate limit') || status.message?.includes('rate limit')) {
+                    rateLimited.push(source);
+                } else {
+                    errored.push(source);
+                }
+            } else if (status.status === 'skipped' && status.reason?.includes('Rate')) {
+                rateLimited.push(source);
+            }
+        });
+
+        // Show notifications based on status
+        if (rateLimited.length > 0 && window.ToastManager) {
+            window.ToastManager.warning(
+                'API Rate Limited',
+                `${rateLimited.join(', ')} is rate limited. Using free data sources instead.`
+            );
+        }
+
+        if (errored.length > 0 && window.ToastManager) {
+            window.ToastManager.warning(
+                'Some Data Unavailable',
+                `Could not fetch from: ${errored.join(', ')}`
+            );
+        }
+
+        // Update banner
+        if (window.DataSourceBanner) {
+            if (rateLimited.length > 0 || errored.length > 0) {
+                const msg = rateLimited.length > 0
+                    ? `Betting odds API rate limited. Showing live scores & players from ESPN.`
+                    : `Some data sources unavailable. Showing available data.`;
+                window.DataSourceBanner.show(msg, 'warning');
+            }
+        }
+
+        // Store status for UI components
+        this.dataSourceStatus = { successful, rateLimited, errored };
+    }
+
+    // Get games from aggregated data
+    getAggregatedGames(sport) {
+        return this.aggregatedData[sport]?.data?.games || [];
+    }
+
+    // Get players from aggregated data
+    getAggregatedPlayers(sport) {
+        return this.aggregatedData[sport]?.data?.players || [];
+    }
+
+// Get teams from aggregated data
+    getAggregatedTeams(sport) {
+        return this.aggregatedData[sport]?.data?.teams || [];
+    }
+
+    // Get injuries from aggregated data
+    getAggregatedInjuries(sport) {
+        return this.aggregatedData[sport]?.data?.injuries || {};
+    }
+
+    // Get calculated odds from aggregated data
+    getCalculatedOdds(sport) {
+        return this.aggregatedData[sport]?.data?.calculatedOdds || [];
+    }
+
+    // Get generated player props from aggregated data
+    getGeneratedProps(sport) {
+        return this.aggregatedData[sport]?.data?.generatedProps || [];
+    }
+
+    // Get props organized by tier from aggregated data
+    getPropsByTier(sport) {
+        return this.aggregatedData[sport]?.data?.propsByTier || null;
+    }
+
+    // Get standings from aggregated data
+    getStandings(sport) {
+        const data = this.aggregatedData[sport]?.data;
+        return data?.nbaStandings || data?.nflStandings || data?.nhlStandings || data?.mlbStandings || [];
+    }
+
+    // Get season averages (NBA from Ball Don't Lie)
+    getSeasonAverages(sport) {
+        return this.aggregatedData[sport]?.data?.seasonAverages || [];
+    }
+
+    // Get sport-specific official data (NHL, MLB)
+    getOfficialGames(sport) {
+        const data = this.aggregatedData[sport]?.data;
+        if (sport === 'nhl') return data?.nhlGames || [];
+        if (sport === 'mlb') return data?.mlbGames || [];
+        return [];
+    }
+
+    // Get data sources status
+    getDataSourcesStatus(sport) {
+        return this.aggregatedData[sport]?.sources || {};
+    }
+
+    // Get current data source status for UI
+    getCurrentDataSourceStatus() {
+        return this.dataSourceStatus || { successful: [], rateLimited: [], errored: [] };
+    }
+
+    // Check if a specific API is rate limited
+    isApiRateLimited(apiName) {
+        return this.dataSourceStatus?.rateLimited?.includes(apiName) || false;
     }
 
     // =====================================================
@@ -218,13 +499,8 @@ class SportsAPIService {
         }
 
         try {
-            const sportKey = SPORT_MAPPINGS[sport]?.oddsApi || sport;
-            const bookmakers = Object.values(BETTING_APPS)
-                .filter(app => app.type === 'sportsbook')
-                .map(app => app.apiKey)
-                .join(',');
-
-            const url = `${API_CONFIG.ODDS_API_BASE}/sports/${sportKey}/odds/?apiKey=${this.oddsApiKey}&regions=us&markets=${markets}&bookmakers=${bookmakers}&oddsFormat=american`;
+            // Fetch odds through proxy server (avoids CORS)
+            const url = `${this.proxyBase}/api/odds/${sport}`;
 
             const response = await fetch(url);
 
@@ -233,12 +509,38 @@ class SportsAPIService {
             }
 
             const data = await response.json();
+
+            // Check if response is a rate limit error
+            if (data.error && data.error.includes('Rate limit')) {
+                console.warn('Odds API rate limited, using demo data');
+                if (window.ToastManager && !this._oddsRateLimitNotified) {
+                    window.ToastManager.warning(
+                        'Odds API Limited',
+                        'Betting odds are temporarily unavailable. Showing sample data.'
+                    );
+                    this._oddsRateLimitNotified = true;
+                }
+                return this.getDemoOdds(sport);
+            }
+
             const formattedData = this.formatOddsData(data, sport);
             this.setCache(cacheKey, formattedData);
 
             return formattedData;
         } catch (error) {
             console.error('Error fetching odds:', error);
+
+            // Show user-friendly error for connection issues
+            if (error.message.includes('Failed to fetch') && !this._connectionErrorNotified) {
+                if (window.ToastManager) {
+                    window.ToastManager.error(
+                        'Connection Error',
+                        'Cannot connect to data server. Check if proxy server is running.'
+                    );
+                }
+                this._connectionErrorNotified = true;
+            }
+
             return this.getDemoOdds(sport);
         }
     }
@@ -386,57 +688,157 @@ class SportsAPIService {
                 return this.getDemoPlayerProps(sport);
             }
 
-            // First get list of events
-            const eventsUrl = `${API_CONFIG.ODDS_API_BASE}/sports/${sportKey}/events?apiKey=${this.oddsApiKey}`;
-            const eventsResponse = await fetch(eventsUrl);
+            // Fetch player props through proxy server (avoids CORS)
+            const propsUrl = `${API_CONFIG.PROXY_BASE}/api/props/${sport}`;
+            const eventsResponse = await fetch(propsUrl);
 
             if (!eventsResponse.ok) {
-                throw new Error('Events API Error');
+                throw new Error('Props API Error');
             }
 
-            const events = await eventsResponse.json();
+            const propsData = await eventsResponse.json();
 
-            // Fetch props for each event (limit to 5 for API conservation)
-            const propsPromises = events.slice(0, 5).map(event =>
-                this.fetchEventPlayerProps(sportKey, event.id, propMarkets, event)
-            );
+            // Check for rate limit error response
+            if (propsData.error && propsData.error.includes('Rate limit')) {
+                console.warn('Props API rate limited, using demo data');
+                if (window.ToastManager && !this._propsRateLimitNotified) {
+                    window.ToastManager.warning(
+                        'Player Props Limited',
+                        'Player props API is rate limited. Showing sample data.'
+                    );
+                    this._propsRateLimitNotified = true;
+                }
+                return this.getDemoPlayerProps(sport);
+            }
 
-            const allProps = await Promise.all(propsPromises);
-            const flatProps = allProps.flat().filter(Boolean);
+            // If proxy returned props directly, use them
+            if (propsData && Array.isArray(propsData)) {
+                // Check if array is empty (could be rate limit or no data)
+                if (propsData.length === 0) {
+                    console.warn('No props data returned, using demo data');
+                    return this.getDemoPlayerProps(sport);
+                }
 
-            // Add sport identifier to each prop
-            const propsWithSport = flatProps.map(prop => ({
-                ...prop,
-                sport: sport,
-                sportName: SPORT_MAPPINGS[sport]?.name || sport.toUpperCase()
-            }));
+                // Format the props from the proxy response
+                const flatProps = this.formatPropsFromProxy(propsData, sport);
 
-            this.setCache(cacheKey, propsWithSport);
-            return propsWithSport;
+                // Add sport identifier to each prop
+                const propsWithSport = flatProps.map(prop => ({
+                    ...prop,
+                    sport: sport,
+                    sportName: SPORT_MAPPINGS[sport]?.name || sport.toUpperCase()
+                }));
+
+                this.setCache(cacheKey, propsWithSport);
+                return propsWithSport;
+            }
+
+            // Fallback to demo data if proxy returns unexpected format
+            return this.getDemoPlayerProps(sport);
         } catch (error) {
             console.error('Error fetching player props:', error);
+
+            // Show connection error only once
+            if (error.message.includes('Failed to fetch') && !this._connectionErrorNotified) {
+                if (window.ToastManager) {
+                    window.ToastManager.error(
+                        'Connection Error',
+                        'Cannot connect to data server. Check if proxy server is running.'
+                    );
+                }
+                this._connectionErrorNotified = true;
+            }
+
             return this.getDemoPlayerProps(sport);
         }
     }
 
+    formatPropsFromProxy(propsData, sport) {
+        const playerPropsMap = new Map();
+
+        propsData.forEach(item => {
+            // Proxy returns { event, odds } where odds contains bookmakers
+            const oddsData = item.odds || item;
+            const eventData = item.event || item;
+
+            if (!oddsData.bookmakers || !oddsData.bookmakers.length) return;
+
+            const eventInfo = {
+                home_team: eventData.home_team || oddsData.home_team,
+                away_team: eventData.away_team || oddsData.away_team,
+                commence_time: eventData.commence_time || oddsData.commence_time
+            };
+
+            oddsData.bookmakers.forEach(bookmaker => {
+                const appKey = Object.keys(BETTING_APPS).find(
+                    key => BETTING_APPS[key].apiKey === bookmaker.key
+                ) || bookmaker.key;
+
+                bookmaker.markets?.forEach(market => {
+                    market.outcomes?.forEach(outcome => {
+                        const playerName = outcome.description;
+                        if (!playerName) return;
+
+                        const propType = this.getPropLabel(market.key);
+
+                        if (!playerPropsMap.has(playerName)) {
+                            const playerStats = window.LiveDataService?.getPlayerStats(playerName);
+                            const rosterInfo = window.RosterService?.getPlayerTeam(playerName);
+
+                            playerPropsMap.set(playerName, {
+                                player: playerName,
+                                team: rosterInfo?.abbr || this.extractTeamFromEvent(eventInfo, playerName),
+                                teamFull: rosterInfo?.team || '',
+                                opponent: this.getOpponentFromEvent(eventInfo, playerName),
+                                position: rosterInfo?.position || this.inferPosition(market.key),
+                                seasonAverages: playerStats?.averages || {},
+                                props: [],
+                                books: {}
+                            });
+                        }
+
+                        const playerData = playerPropsMap.get(playerName);
+
+                        let propEntry = playerData.props.find(p => p.type === propType);
+                        if (!propEntry) {
+                            const avgKey = this.getAverageKey(market.key);
+                            const seasonAvg = playerData.seasonAverages?.[avgKey];
+                            const aiPick = this.calculateAIPickWithAverage(outcome, market.key, seasonAvg);
+                            const probability = this.calculateProbabilityWithAverage(outcome.price, seasonAvg, outcome.point);
+
+                            propEntry = {
+                                type: propType,
+                                line: outcome.point,
+                                seasonAverage: seasonAvg || null,
+                                aiPick: aiPick,
+                                probability: probability,
+                                bookLines: {}
+                            };
+                            playerData.props.push(propEntry);
+                        }
+
+                        propEntry.bookLines[appKey] = {
+                            line: outcome.point,
+                            overOdds: outcome.name === 'Over' ? outcome.price : propEntry.bookLines[appKey]?.overOdds,
+                            underOdds: outcome.name === 'Under' ? outcome.price : propEntry.bookLines[appKey]?.underOdds
+                        };
+
+                        if (!playerData.books[appKey]) {
+                            playerData.books[appKey] = BETTING_APPS[appKey] || { id: appKey, name: appKey };
+                        }
+                    });
+                });
+            });
+        });
+
+        return Array.from(playerPropsMap.values());
+    }
+
     async fetchEventPlayerProps(sport, eventId, markets, eventInfo) {
-        try {
-            const bookmakers = Object.values(BETTING_APPS)
-                .filter(app => app.type === 'sportsbook')
-                .map(app => app.apiKey)
-                .join(',');
-
-            const url = `${API_CONFIG.ODDS_API_BASE}/sports/${sport}/events/${eventId}/odds?apiKey=${this.oddsApiKey}&regions=us&markets=${markets}&oddsFormat=american&bookmakers=${bookmakers}`;
-
-            const response = await fetch(url);
-            if (!response.ok) return [];
-
-            const data = await response.json();
-            return this.formatPlayerPropsFromAPI(data, eventInfo);
-        } catch (error) {
-            console.error('Error fetching event props:', error);
-            return [];
-        }
+        // This method is deprecated - props are now fetched through the proxy server
+        // Keeping for backward compatibility, but it returns empty
+        console.warn('fetchEventPlayerProps is deprecated - use proxy server instead');
+        return [];
     }
 
     formatPlayerPropsFromAPI(data, eventInfo) {

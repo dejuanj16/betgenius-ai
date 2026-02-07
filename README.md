@@ -99,6 +99,10 @@ The proxy server exposes the following endpoints:
 | `GET /api/events/:sport` | Upcoming games/events |
 | `GET /api/scores/:sport` | Live scores (ESPN) |
 | `GET /api/injuries/:sport` | Injury reports (ESPN) |
+| `GET /api/cache/clear` | Clear all props cache |
+| `GET /api/cache/clear/:sport` | Clear cache for specific sport |
+| `GET /health` | Health check with rate limit & cache status |
+| `GET /api/injuries/:sport` | Injury reports (ESPN) |
 | `GET /health` | Health check with rate limit status |
 
 **Supported sports:** `nba`, `nfl`, `nhl`, `mlb`, `ncaab`, `ncaaf`

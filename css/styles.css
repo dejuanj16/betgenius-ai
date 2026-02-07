@@ -1003,3 +1003,1116 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
     .game-odds { width: 100%; justify-content: center; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); }
     .footer-content { grid-template-columns: 1fr; gap: 1.5rem; }
 }
+
+/* =====================================================
+   Toast Notifications
+   ===================================================== */
+.toast-container {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 400px;
+}
+
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    border-radius: var(--border-radius);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    animation: slideIn 0.3s ease;
+    min-width: 300px;
+}
+
+.toast.toast-success {
+    border-left: 4px solid var(--success);
+    background: linear-gradient(90deg, var(--success-bg) 0%, var(--bg-card) 100%);
+}
+
+.toast.toast-warning {
+    border-left: 4px solid var(--warning);
+    background: linear-gradient(90deg, var(--warning-bg) 0%, var(--bg-card) 100%);
+}
+
+.toast.toast-error {
+    border-left: 4px solid var(--danger);
+    background: linear-gradient(90deg, var(--danger-bg) 0%, var(--bg-card) 100%);
+}
+
+.toast.toast-info {
+    border-left: 4px solid var(--info);
+    background: linear-gradient(90deg, var(--info-bg) 0%, var(--bg-card) 100%);
+}
+
+.toast-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.toast-success .toast-icon { color: var(--success); }
+.toast-warning .toast-icon { color: var(--warning); }
+.toast-error .toast-icon { color: var(--danger); }
+.toast-info .toast-icon { color: var(--info); }
+
+.toast-content {
+    flex: 1;
+}
+
+.toast-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.toast-message {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    font-size: 1rem;
+    transition: color 0.2s;
+}
+
+.toast-close:hover {
+    color: var(--text-primary);
+}
+
+.toast.fade-out {
+    animation: slideOut 0.3s ease forwards;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* =====================================================
+   Data Source Status Banner
+   ===================================================== */
+.data-source-banner {
+    position: fixed;
+    top: 70px;
+    left: 0;
+    right: 0;
+    z-index: 999;
+    padding: 0 20px;
+}
+
+.data-source-banner .banner-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning);
+    border-radius: var(--border-radius);
+    color: var(--warning);
+}
+
+.data-source-banner.banner-error .banner-content {
+    background: var(--danger-bg);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.data-source-banner.banner-success .banner-content {
+    background: var(--success-bg);
+    border-color: var(--success);
+    color: var(--success);
+}
+
+.data-source-banner i {
+    font-size: 1.25rem;
+}
+
+.data-source-banner span {
+    flex: 1;
+    font-size: 0.9rem;
+}
+
+.banner-close {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 4px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.banner-close:hover {
+    opacity: 1;
+}
+
+/* =====================================================
+   Data Source Status Indicators
+   ===================================================== */
+.data-sources-status {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+}
+
+.source-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg-card);
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.source-indicator .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.source-indicator.source-live .status-dot {
+    background: var(--success);
+    box-shadow: 0 0 6px var(--success);
+}
+
+.source-indicator.source-limited .status-dot {
+    background: var(--warning);
+}
+
+.source-indicator.source-error .status-dot {
+    background: var(--danger);
+}
+
+.source-indicator.source-live { color: var(--success); }
+.source-indicator.source-limited { color: var(--warning); }
+.source-indicator.source-error { color: var(--text-muted); }
+
+/* =====================================================
+   Enhanced Betting Display Styles
+   ===================================================== */
+
+/* Game Card with Calculated Odds */
+.game-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    transition: var(--transition);
+}
+
+.game-card:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+}
+
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.game-sport-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.game-sport-badge.nba { background: linear-gradient(135deg, #C9082A, #17408B); color: white; }
+.game-sport-badge.nfl { background: linear-gradient(135deg, #013369, #D50A0A); color: white; }
+.game-sport-badge.nhl { background: linear-gradient(135deg, #000000, #A2AAAD); color: white; }
+.game-sport-badge.mlb { background: linear-gradient(135deg, #002D72, #D50032); color: white; }
+
+.game-time-info {
+    text-align: right;
+}
+
+.game-time-value {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.game-date {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Team Rows with Odds */
+.game-teams-odds {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.team-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius-sm);
+}
+
+.team-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.team-logo-small {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: var(--bg-secondary);
+    border-radius: 50%;
+}
+
+.team-logo-small img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.team-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.team-odds {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.odds-ml {
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
+.odds-ml.favorite {
+    color: var(--success);
+}
+
+.odds-ml.underdog {
+    color: var(--warning);
+}
+
+.odds-spread {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Game Total */
+.game-total {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--accent-gradient);
+    border-radius: var(--border-radius-sm);
+    margin-bottom: 0.75rem;
+}
+
+.total-label {
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.8);
+}
+
+.total-value {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: white;
+}
+
+/* Win Probability */
+.game-prediction {
+    text-align: center;
+}
+
+.prediction-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+
+.prediction-bars {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--bg-tertiary);
+    margin-bottom: 0.25rem;
+}
+
+.prob-bar {
+    transition: width 0.5s ease;
+}
+
+.prob-bar.away {
+    background: var(--warning);
+}
+
+.prob-bar.home {
+    background: var(--success);
+}
+
+.prediction-values {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+/* Player Props with Multi-Sportsbook Odds */
+.prop-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    transition: var(--transition);
+}
+
+.prop-card:hover {
+    border-color: var(--accent-primary);
+}
+
+.prop-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.prop-player-img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    background: var(--bg-tertiary);
+    overflow: hidden;
+}
+
+.prop-player-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.prop-player-info {
+    flex: 1;
+}
+
+.prop-player-info h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.125rem;
+}
+
+.prop-player-team {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.prop-season-avg {
+    font-size: 0.75rem;
+    color: var(--accent-primary);
+    margin-top: 0.125rem;
+}
+
+.prop-sport-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: var(--accent-gradient);
+    color: white;
+}
+
+/* Prop Type and Line */
+.prop-type-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.prop-type {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.prop-line-value {
+    font-size: 1.1rem;
+}
+
+.prop-line-value strong {
+    color: var(--accent-primary);
+    font-size: 1.25rem;
+}
+
+/* Prop Odds Grid */
+.prop-odds-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.prop-odds-section {
+    padding: 0.5rem;
+    border-radius: var(--border-radius-sm);
+    background: var(--bg-tertiary);
+}
+
+.prop-odds-section.over {
+    border-left: 3px solid var(--success);
+}
+
+.prop-odds-section.under {
+    border-left: 3px solid var(--danger);
+}
+
+.odds-direction {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 0.375rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.prop-odds-section.over .odds-direction {
+    color: var(--success);
+}
+
+.prop-odds-section.under .odds-direction {
+    color: var(--danger);
+}
+
+.odds-books {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.25rem;
+}
+
+.odds-book-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    padding: 0.25rem;
+    background: var(--bg-secondary);
+    border-radius: 3px;
+}
+
+.book-name {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.book-odds {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.book-odds.plus {
+    color: var(--success);
+}
+
+/* Props Grid Layout */
+.props-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+}
+
+.props-sport-section {
+    margin-bottom: 2rem;
+}
+
+.props-sport-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--accent-primary);
+}
+
+/* Data Sources Banner in Props */
+.data-sources-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--success-bg);
+    border: 1px solid var(--success);
+    border-radius: var(--border-radius);
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.data-sources-banner.live {
+    border-color: var(--success);
+    background: var(--success-bg);
+}
+
+.data-sources-banner.fallback {
+    border-color: var(--warning);
+    background: var(--warning-bg);
+}
+
+.data-sources-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.data-sources-header i {
+    color: var(--success);
+}
+
+.data-sources-list {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.source-item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8rem;
+}
+
+.source-label {
+    color: var(--text-muted);
+}
+
+.source-status {
+    font-weight: 500;
+}
+
+.source-detail {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.update-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+/* =====================================================
+   AI Prediction Styles
+   ===================================================== */
+
+/* Confidence Badge */
+.prop-confidence-badge {
+    padding: 0.375rem 0.625rem;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+.prop-confidence-badge.high {
+    background: var(--success);
+    color: white;
+}
+
+.prop-confidence-badge.medium {
+    background: var(--warning);
+    color: #000;
+}
+
+.prop-confidence-badge.low {
+    background: var(--text-muted);
+    color: white;
+}
+
+/* AI Prediction Box */
+.ai-prediction-box {
+    padding: 0.75rem;
+    border-radius: var(--border-radius-sm);
+    margin-bottom: 0.75rem;
+    border: 2px solid;
+}
+
+.ai-prediction-box.over {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
+    border-color: var(--success);
+}
+
+.ai-prediction-box.under {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+    border-color: var(--danger);
+}
+
+.ai-pick-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.ai-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.ai-pick-value {
+    font-weight: 800;
+    font-size: 1rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+}
+
+.ai-pick-value.over {
+    background: var(--success);
+    color: white;
+}
+
+.ai-pick-value.under {
+    background: var(--danger);
+    color: white;
+}
+
+.ai-pick-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.375rem;
+}
+
+.ai-pick-line .prop-type {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.ai-pick-line .line-value {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.ai-reasoning {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+    padding-top: 0.375rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Sportsbook Odds Comparison */
+.prop-odds-comparison {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.odds-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid transparent;
+    transition: var(--transition);
+}
+
+.odds-row.selected {
+    border-color: var(--accent-primary);
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.odds-row .direction {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    width: 50px;
+}
+
+.books-odds {
+    display: flex;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.book-odd {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.25rem 0.375rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    min-width: 45px;
+}
+
+.book-abbr {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.odd-val {
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+}
+
+.odd-val.plus {
+    color: var(--success);
+}
+
+/* Sport-specific prop badges */
+.prop-sport-badge.nba { background: linear-gradient(135deg, #C9082A, #17408B); }
+.prop-sport-badge.nfl { background: linear-gradient(135deg, #013369, #D50A0A); }
+.prop-sport-badge.nhl { background: linear-gradient(135deg, #000000, #A2AAAD); }
+.prop-sport-badge.mlb { background: linear-gradient(135deg, #002D72, #D50032); }
+
+/* =====================================================
+   Tier-Based Props Organization
+   ===================================================== */
+
+.tier-section {
+    margin-bottom: 2rem;
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+}
+
+.tier-header {
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.tier-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.tier-title i {
+    font-size: 1.2rem;
+}
+
+.tier-count {
+    margin-left: auto;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.tier-description {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* TOP PICKS Tier - Fire/Gold theme */
+.tier-section.tier-top {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.15));
+    border: 2px solid rgba(245, 158, 11, 0.5);
+}
+
+.tier-section.tier-top .tier-header {
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.2), transparent);
+}
+
+.tier-section.tier-top .tier-title {
+    color: #fbbf24;
+}
+
+.tier-section.tier-top .tier-title i {
+    color: #f59e0b;
+}
+
+.prop-card.lock {
+    border: 2px solid rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+}
+
+/* GOOD VALUE Tier - Green theme */
+.tier-section.tier-good {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(52, 211, 153, 0.05));
+    border: 2px solid rgba(16, 185, 129, 0.4);
+}
+
+.tier-section.tier-good .tier-header {
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.15), transparent);
+}
+
+.tier-section.tier-good .tier-title {
+    color: #34d399;
+}
+
+.tier-section.tier-good .tier-title i {
+    color: #10b981;
+}
+
+.prop-card.good {
+    border: 2px solid rgba(16, 185, 129, 0.4);
+}
+
+/* LEANS Tier - Blue theme */
+.tier-section.tier-lean {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.05));
+    border: 2px solid rgba(99, 102, 241, 0.3);
+}
+
+.tier-section.tier-lean .tier-header {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.1), transparent);
+}
+
+.tier-section.tier-lean .tier-title {
+    color: #818cf8;
+}
+
+.tier-section.tier-lean .tier-title i {
+    color: #6366f1;
+}
+
+.prop-card.lean {
+    border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+/* RISKY Tier - Muted/Gray theme */
+.tier-section.tier-risky {
+    background: linear-gradient(135deg, rgba(100, 116, 139, 0.1), rgba(71, 85, 105, 0.05));
+    border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+.tier-section.tier-risky .tier-header {
+    background: linear-gradient(90deg, rgba(100, 116, 139, 0.1), transparent);
+}
+
+.tier-section.tier-risky .tier-title {
+    color: #94a3b8;
+}
+
+.tier-section.tier-risky .tier-title i {
+    color: #f59e0b;
+}
+
+.prop-card.fade {
+    opacity: 0.85;
+    border: 1px solid var(--border-color);
+}
+
+/* Tier Badges */
+.prop-badges {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.375rem;
+}
+
+.tier-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.tier-badge.lock {
+    background: linear-gradient(135deg, #ef4444, #f59e0b);
+    color: #fff;
+    animation: tier-glow 2s ease-in-out infinite;
+}
+
+.tier-badge.good {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.tier-badge.lean {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.tier-badge.fade {
+    background: rgba(100, 116, 139, 0.15);
+    color: #94a3b8;
+    border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+@keyframes tier-glow {
+    0%, 100% { box-shadow: 0 0 5px rgba(245, 158, 11, 0.3); }
+    50% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.5); }
+}
+
+/* Props grid within tiers */
+.tier-section .props-grid {
+    padding: 1rem;
+    padding-top: 0;
+}
+
+/* Responsive adjustments for tier sections */
+@media (max-width: 768px) {
+    .tier-header {
+        padding: 0.75rem 1rem;
+    }
+
+    .tier-title {
+        font-size: 0.95rem;
+    }
+
+    .tier-count {
+        font-size: 0.75rem;
+    }
+
+    .tier-description {
+        font-size: 0.7rem;
+    }
+}
+
+/* =====================================================
+   Off-Season Messaging
+   ===================================================== */
+
+.off-season-notice {
+    background: var(--warning-bg);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.off-season-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--warning);
+    margin-bottom: 0.5rem;
+}
+
+.off-season-header i {
+    font-size: 1.1rem;
+}
+
+.off-season-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.off-season-sport {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--text-secondary);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+.off-season-message {
+    text-align: center;
+    padding: 3rem 2rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+}
+
+.off-season-message i {
+    color: var(--warning);
+    margin-bottom: 1rem;
+}
+
+.off-season-message h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+}
+
+.off-season-message p {
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.off-season-message strong {
+    color: var(--accent-primary);
+}
+
+.off-season-message button {
+    margin-top: 1.5rem;
+    padding: 0.75rem 2rem;
+    background: var(--accent-gradient);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.off-season-message button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow);
+}

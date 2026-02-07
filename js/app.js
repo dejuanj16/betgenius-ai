@@ -8,6 +8,11 @@ let currentApp = 'all';
 let currentPropsApp = 'all';
 let minConfidence = 60;
 let autoRefreshInterval = null;
+let dataRefreshInterval = null;
+
+// Auto-refresh intervals
+const LIVE_REFRESH_INTERVAL = 30000;  // 30 seconds for live games
+const DATA_REFRESH_INTERVAL = 300000; // 5 minutes for full data refresh
 
 // Calendar filter - only show games within 4 days from today
 const MAX_DAYS_OUT = 4;
@@ -40,6 +45,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     initConfidenceSlider();
     initEventListeners();
 
+    // Initialize toast manager
+    if (window.ToastManager) {
+        window.ToastManager.init();
+    }
+
     // Initialize all live data services
     console.log('🚀 Initializing BetGenius AI...');
 
@@ -51,6 +61,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Load initial data
     await loadAllData();
+
+    // Update data source status display
+    updateDataSourceStatusDisplay();
 
     // Hide loading overlay
     setTimeout(() => {
@@ -66,6 +79,38 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.log('📊 Data Sources:', sources);
     }
 });
+
+// Update Data Source Status Display
+function updateDataSourceStatusDisplay() {
+    const status = window.SportsAPI?.getCurrentDataSourceStatus();
+    if (!status) return;
+
+    const { successful, rateLimited, errored } = status;
+
+    // Log status
+    console.log('📊 Data Sources Status:', {
+        live: successful,
+        rateLimited: rateLimited,
+        errors: errored
+    });
+
+    // Show banner if any sources are limited
+    if (rateLimited.length > 0) {
+        if (window.DataSourceBanner) {
+            window.DataSourceBanner.showRateLimited();
+        }
+    }
+
+    // Show success toast if all working
+    if (successful.length > 0 && rateLimited.length === 0 && errored.length === 0) {
+        if (window.ToastManager) {
+            window.ToastManager.success(
+                'Data Loaded',
+                `Connected to ${successful.length} data sources successfully.`
+            );
+        }
+    }
+}
 
 // =====================================================
 // Navigation
@@ -229,12 +274,78 @@ function initConfidenceSlider() {
 }
 
 // =====================================================
+// Seasonal Sport Awareness
+// =====================================================
+function getSportSeasonStatus() {
+    const now = new Date();
+    const month = now.getMonth() + 1; // 1-12
+
+    return {
+        nba: {
+            inSeason: (month >= 10 || month <= 6),
+            name: 'NBA',
+            seasonDates: 'October - June'
+        },
+        nfl: {
+            inSeason: (month >= 9 || month <= 2),
+            name: 'NFL',
+            seasonDates: 'September - February'
+        },
+        nhl: {
+            inSeason: (month >= 10 || month <= 6),
+            name: 'NHL',
+            seasonDates: 'October - June'
+        },
+        mlb: {
+            inSeason: (month >= 4 && month <= 10),
+            name: 'MLB',
+            seasonDates: 'April - October'
+        }
+    };
+}
+
+function getActiveSports() {
+    const seasons = getSportSeasonStatus();
+    return Object.keys(seasons).filter(sport => seasons[sport].inSeason);
+}
+
+function isSportInSeason(sport) {
+    const seasons = getSportSeasonStatus();
+    return seasons[sport]?.inSeason || false;
+}
+
+// =====================================================
 // Load All Data
 // =====================================================
 async function loadAllData() {
     updateLastUpdateTime();
 
-    const sports = currentSport === 'all' ? ['nba', 'nfl', 'mlb', 'nhl'] : [currentSport];
+    // Only load data for in-season sports
+    const activeSports = getActiveSports();
+
+    let sports;
+    if (currentSport === 'all') {
+        sports = activeSports;
+        console.log('📅 Active in-season sports:', sports);
+    } else {
+        // Check if selected sport is in season
+        if (!isSportInSeason(currentSport)) {
+            const seasons = getSportSeasonStatus();
+            console.warn(`⚠️ ${currentSport.toUpperCase()} is off-season (Season: ${seasons[currentSport]?.seasonDates})`);
+        }
+        sports = [currentSport];
+    }
+
+    // First, fetch aggregated data from all sources
+    console.log('🔄 Loading data for sports:', sports);
+
+    for (const sport of sports) {
+        try {
+            await window.SportsAPI.fetchAggregatedData(sport);
+        } catch (e) {
+            console.warn(`Could not fetch aggregate data for ${sport}:`, e.message);
+        }
+    }
 
     // Load data in parallel
     await Promise.all([
@@ -258,13 +369,60 @@ function updateLastUpdateTime() {
 async function loadDashboardData(sports) {
     let allGames = [];
     let allOdds = [];
+    let allPlayers = [];
+    let allTeams = [];
 
     for (const sport of sports) {
-        const games = await window.SportsAPI.fetchGames(sport);
+        // Try to get data from aggregated endpoint first
+        const aggregatedGames = window.SportsAPI.getAggregatedGames(sport);
+        const aggregatedPlayers = window.SportsAPI.getAggregatedPlayers(sport);
+        const aggregatedTeams = window.SportsAPI.getAggregatedTeams(sport);
+
+        if (aggregatedGames.length > 0) {
+            // Use aggregated ESPN data - format it for display
+            const formattedGames = aggregatedGames.map(event => ({
+                id: event.id,
+                sport: sport,
+                sportName: window.SPORT_MAPPINGS?.[sport]?.name || sport.toUpperCase(),
+                name: event.name,
+                shortName: event.shortName,
+                date: new Date(event.date),
+                status: event.status,
+                homeTeam: {
+                    name: event.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home')?.team?.displayName,
+                    abbreviation: event.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home')?.team?.abbreviation,
+                    score: event.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home')?.score,
+                    logo: event.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home')?.team?.logo
+                },
+                awayTeam: {
+                    name: event.competitions?.[0]?.competitors?.find(c => c.homeAway === 'away')?.team?.displayName,
+                    abbreviation: event.competitions?.[0]?.competitors?.find(c => c.homeAway === 'away')?.team?.abbreviation,
+                    score: event.competitions?.[0]?.competitors?.find(c => c.homeAway === 'away')?.score,
+                    logo: event.competitions?.[0]?.competitors?.find(c => c.homeAway === 'away')?.team?.logo
+                },
+                isLive: event.status?.type?.state === 'in',
+                statusDetail: event.status?.type?.detail || event.status?.type?.description
+            }));
+            allGames = allGames.concat(formattedGames);
+            console.log(`✅ Loaded ${formattedGames.length} ${sport.toUpperCase()} games from aggregate`);
+        } else {
+            // Fallback to direct API
+            const games = await window.SportsAPI.fetchGames(sport);
+            allGames = allGames.concat(games);
+        }
+
+        // Get odds (may be limited due to rate limits)
         const odds = await window.SportsAPI.fetchOdds(sport);
-        allGames = allGames.concat(games);
         allOdds = allOdds.concat(odds);
+
+        // Store player/team data for later use
+        allPlayers = allPlayers.concat(aggregatedPlayers);
+        allTeams = allTeams.concat(aggregatedTeams);
     }
+
+    // Store players and teams globally for other components
+    window.aggregatedPlayers = allPlayers;
+    window.aggregatedTeams = allTeams;
 
     // Filter games to only show within 4 days
     allGames = filterByDateRange(allGames);
@@ -362,7 +520,75 @@ function loadTopPicks(oddsData) {
 function loadUpcomingGames(games, oddsData) {
     const container = document.getElementById('upcomingGames');
 
-    // Filter out live games
+    // Get calculated odds from aggregated data
+    const sports = currentSport === 'all' ? ['nba', 'nfl', 'mlb', 'nhl'] : [currentSport];
+    let calculatedOdds = [];
+    sports.forEach(sport => {
+        const sportOdds = window.SportsAPI.getCalculatedOdds(sport);
+        calculatedOdds = calculatedOdds.concat(sportOdds.map(o => ({ ...o, sport })));
+    });
+
+    // Use calculated odds if available
+    if (calculatedOdds.length > 0) {
+        container.innerHTML = calculatedOdds.slice(0, 8).map(game => {
+            const home = game.homeTeam || {};
+            const away = game.awayTeam || {};
+            const total = game.total || {};
+            const sportName = window.SPORT_MAPPINGS?.[game.sport]?.name || game.sport?.toUpperCase();
+
+            return `
+                <div class="game-card">
+                    <div class="game-header">
+                        <span class="game-sport-badge ${game.sport}">${sportName}</span>
+                        <div class="game-time-info">
+                            <div class="game-time-value">${formatGameTime(game.startTime)}</div>
+                            <div class="game-date">${formatGameDate(game.startTime)}</div>
+                        </div>
+                    </div>
+                    <div class="game-teams-odds">
+                        <div class="team-row away">
+                            <div class="team-info">
+                                <div class="team-logo-small">${away.logo ? `<img src="${away.logo}" alt="">` : getTeamInitials(away.name)}</div>
+                                <div class="team-name">${away.abbreviation || shortenTeamName(away.name)}</div>
+                            </div>
+                            <div class="team-odds">
+                                <span class="odds-ml ${away.moneyline > 0 ? 'underdog' : 'favorite'}">${formatOddsValue(away.moneyline)}</span>
+                                <span class="odds-spread">${formatSpread(away.spread)}</span>
+                            </div>
+                        </div>
+                        <div class="team-row home">
+                            <div class="team-info">
+                                <div class="team-logo-small">${home.logo ? `<img src="${home.logo}" alt="">` : getTeamInitials(home.name)}</div>
+                                <div class="team-name">${home.abbreviation || shortenTeamName(home.name)}</div>
+                            </div>
+                            <div class="team-odds">
+                                <span class="odds-ml ${home.moneyline > 0 ? 'underdog' : 'favorite'}">${formatOddsValue(home.moneyline)}</span>
+                                <span class="odds-spread">${formatSpread(home.spread)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="game-total">
+                        <div class="total-label">O/U</div>
+                        <div class="total-value">${total.points || '--'}</div>
+                    </div>
+                    <div class="game-prediction">
+                        <div class="prediction-label">Win Prob</div>
+                        <div class="prediction-bars">
+                            <div class="prob-bar away" style="width: ${parseFloat(away.winProb) || 50}%"></div>
+                            <div class="prob-bar home" style="width: ${parseFloat(home.winProb) || 50}%"></div>
+                        </div>
+                        <div class="prediction-values">
+                            <span>${away.winProb || '50%'}</span>
+                            <span>${home.winProb || '50%'}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        return;
+    }
+
+    // Fallback: Filter out live games
     const upcoming = games.filter(g => !g.isLive).slice(0, 8);
 
     if (!upcoming.length) {
@@ -517,56 +743,265 @@ function filterOddsTable() {
 }
 
 // =====================================================
-// Player Props - Enhanced with roster validation
+// Player Props - Enhanced with tier organization
 // =====================================================
 async function loadPlayerProps() {
     const container = document.getElementById('playerProps');
 
-    container.innerHTML = '<div class="loading-placeholder"><i class="fas fa-spinner fa-spin"></i> Loading props and checking rosters...</div>';
+    container.innerHTML = '<div class="loading-placeholder"><i class="fas fa-spinner fa-spin"></i> Loading player props...</div>';
 
-    // Ensure roster service is initialized
-    if (window.RosterService && !window.RosterService.getLastUpdate()) {
-        await window.RosterService.initialize();
-    }
-
-    // Only load props for the selected sport, or all major sports if 'all'
+    // Only load props for in-season sports
     let sports = [];
+    const activeSports = getActiveSports();
+
     if (currentSport === 'all') {
-        sports = ['nba', 'nfl', 'nhl', 'mlb'];
+        sports = activeSports; // Only active sports
     } else {
         sports = [currentSport];
     }
 
-    let allProps = [];
+    // Track off-season sports for messaging
+    const offSeasonSports = ['nba', 'nfl', 'nhl', 'mlb'].filter(s => !isSportInSeason(s));
 
+    let allPropsByTier = {
+        topPicks: [],
+        goodValue: [],
+        leans: [],
+        risky: [],
+        all: []
+    };
+
+    // First, try to get tiered props from aggregated data (only in-season sports)
     for (const sport of sports) {
-        const props = await window.SportsAPI.fetchPlayerProps(sport);
-        // Ensure each prop has the sport tagged
-        const taggedProps = props.map(p => ({
-            ...p,
-            sport: sport,
-            sportName: window.SPORT_MAPPINGS[sport]?.name || sport.toUpperCase()
-        }));
-        allProps = allProps.concat(taggedProps);
+        // Skip if sport is off-season
+        if (!isSportInSeason(sport)) {
+            console.log(`⏭️ Skipping ${sport.toUpperCase()} - off-season`);
+            continue;
+        }
+
+        const tierData = window.SportsAPI.getPropsByTier(sport);
+        if (tierData) {
+            ['topPicks', 'goodValue', 'leans', 'risky', 'all'].forEach(tier => {
+                if (tierData[tier]) {
+                    const formattedProps = tierData[tier].map(p => formatPropForDisplay(p, sport));
+                    allPropsByTier[tier] = allPropsByTier[tier].concat(formattedProps);
+                }
+            });
+        } else {
+            // Fall back to generatedProps if no tier data
+            const generatedProps = window.SportsAPI.getGeneratedProps(sport);
+            if (generatedProps && generatedProps.length > 0) {
+                const formattedProps = generatedProps.map(p => formatPropForDisplay(p, sport));
+                allPropsByTier.all = allPropsByTier.all.concat(formattedProps);
+            }
+        }
     }
 
-    // Apply roster validation - update teams and filter injured
-    if (window.RosterService) {
-        allProps = allProps.map(prop => window.RosterService.updatePropWithRosterInfo(prop));
-        allProps = window.RosterService.filterAvailablePlayers(allProps);
+    // If still no props, fall back to old fetch method (only for in-season sports)
+    if (allPropsByTier.all.length === 0 &&
+        allPropsByTier.topPicks.length === 0 &&
+        allPropsByTier.goodValue.length === 0) {
+        for (const sport of sports) {
+            if (!isSportInSeason(sport)) continue;
+
+            const props = await window.SportsAPI.fetchPlayerProps(sport);
+            const taggedProps = props.map(p => ({
+                ...p,
+                sport: sport,
+                sportName: window.SPORT_MAPPINGS[sport]?.name || sport.toUpperCase()
+            }));
+            allPropsByTier.all = allPropsByTier.all.concat(taggedProps);
+        }
     }
 
     // Filter by app if selected
     if (currentPropsApp !== 'all') {
-        allProps = allProps.filter(p => p.books && p.books[currentPropsApp]);
+        ['topPicks', 'goodValue', 'leans', 'risky', 'all'].forEach(tier => {
+            allPropsByTier[tier] = allPropsByTier[tier].filter(p => p.books && p.books[currentPropsApp]);
+        });
     }
 
-    if (!allProps.length) {
-        container.innerHTML = '<div class="no-data"><i class="fas fa-user-slash"></i><p>No player props available</p></div>';
+    const totalProps = allPropsByTier.topPicks.length + allPropsByTier.goodValue.length +
+                       allPropsByTier.leans.length + allPropsByTier.risky.length || allPropsByTier.all.length;
+
+    let html = '';
+
+    // Show off-season notice if applicable
+    if (offSeasonSports.length > 0 && currentSport === 'all') {
+        const seasons = getSportSeasonStatus();
+        html += `<div class="off-season-notice">
+            <div class="off-season-header">
+                <i class="fas fa-calendar-times"></i>
+                <strong>Off-Season Sports</strong>
+            </div>
+            <div class="off-season-list">
+                ${offSeasonSports.map(sport => {
+                    const info = seasons[sport];
+                    return `<span class="off-season-sport">${info.name} (${info.seasonDates})</span>`;
+                }).join('')}
+            </div>
+        </div>`;
+    }
+
+    // Handle single off-season sport selection
+    if (currentSport !== 'all' && !isSportInSeason(currentSport)) {
+        const seasons = getSportSeasonStatus();
+        const info = seasons[currentSport];
+        container.innerHTML = `
+            <div class="off-season-message">
+                <i class="fas fa-calendar-times fa-3x"></i>
+                <h3>${info.name} is Currently Off-Season</h3>
+                <p>The ${info.name} regular season runs from <strong>${info.seasonDates}</strong>.</p>
+                <p>Real player props and statistics will be available when the season begins.</p>
+                <button class="btn-primary" onclick="document.querySelector('[data-sport=\\'all\\']')?.click()">
+                    View Active Sports
+                </button>
+            </div>
+        `;
         return;
     }
 
-    // Group by sport for better organization
+    if (totalProps === 0) {
+        container.innerHTML = html + '<div class="no-data"><i class="fas fa-user-slash"></i><p>No player props available. Real-time data only - no estimates.</p></div>';
+        return;
+    }
+
+    // Show data sources status
+    const sources = window.SportsAPI.getCurrentDataSourceStatus();
+    const sourcesCount = sources.successful?.length || 0;
+
+    html += `<div class="data-sources-banner live">
+        <div class="data-sources-header">
+            <i class="fas fa-database"></i>
+            <strong>Real Data Sources</strong>
+            <span class="update-time">Last sync: ${new Date().toLocaleTimeString()}</span>
+        </div>
+        <div class="data-sources-list">
+            <div class="source-item">
+                <span class="source-label">Props:</span>
+                <span class="source-status">✅ ${totalProps} AI predictions from real stats</span>
+            </div>
+            <div class="source-item">
+                <span class="source-label">Sources:</span>
+                <span class="source-status">✅ ${sourcesCount} official APIs</span>
+            </div>
+        </div>
+    </div>`;
+
+    // Check if we have tiered data
+    const hasTieredData = allPropsByTier.topPicks.length > 0 ||
+                          allPropsByTier.goodValue.length > 0 ||
+                          allPropsByTier.leans.length > 0 ||
+                          allPropsByTier.risky.length > 0;
+
+    if (hasTieredData) {
+        // Render tiered sections
+        html += renderTieredProps(allPropsByTier);
+    } else {
+        // Fallback: Group by sport for non-tiered data
+        html += renderPropsBySport(allPropsByTier.all);
+    }
+
+    container.innerHTML = html;
+}
+
+// Format a prop for display
+function formatPropForDisplay(p, sport) {
+    return {
+        player: p.player,
+        team: p.team,
+        position: p.position || '',
+        sport: sport,
+        sportName: window.SPORT_MAPPINGS[sport]?.name || sport.toUpperCase(),
+        headshot: p.headshot,
+        propType: p.propType,
+        line: p.line,
+        props: [{
+            type: p.propType,
+            line: p.line,
+            seasonAvg: p.seasonTotal,
+            overOdds: p.over,
+            underOdds: p.under,
+            aiPick: p.aiPick,
+            confidence: p.confidence,
+            reasoning: p.reasoning,
+            trend: p.trend
+        }],
+        books: p.over,
+        source: p.source,
+        aiPick: p.aiPick || 'OVER',
+        confidence: p.confidence || 65,
+        reasoning: p.reasoning || '',
+        trend: p.trend || 'NEUTRAL',
+        seasonAvg: p.seasonTotal,
+        tier: p.tier || 'LEAN',
+        tierLabel: p.tierLabel || ''
+    };
+}
+
+// Render props organized by tier
+function renderTieredProps(propsByTier) {
+    let html = '';
+
+    const tierConfig = [
+        {
+            key: 'topPicks',
+            title: '🔥 TOP PICKS - Highest Confidence',
+            description: '75%+ confidence based on statistical analysis',
+            class: 'tier-top',
+            icon: 'fa-fire'
+        },
+        {
+            key: 'goodValue',
+            title: '✅ GOOD VALUE - Strong Plays',
+            description: '65-74% confidence - solid statistical edge',
+            class: 'tier-good',
+            icon: 'fa-check-circle'
+        },
+        {
+            key: 'leans',
+            title: '📊 LEANS - Worth Considering',
+            description: '55-64% confidence - moderate edge',
+            class: 'tier-lean',
+            icon: 'fa-chart-line'
+        },
+        {
+            key: 'risky',
+            title: '⚠️ RISKY - Proceed with Caution',
+            description: 'Below 55% confidence - higher variance',
+            class: 'tier-risky',
+            icon: 'fa-exclamation-triangle'
+        }
+    ];
+
+    tierConfig.forEach(tier => {
+        const props = propsByTier[tier.key] || [];
+        if (props.length > 0) {
+            html += `
+                <div class="tier-section ${tier.class}">
+                    <div class="tier-header">
+                        <div class="tier-title">
+                            <i class="fas ${tier.icon}"></i>
+                            ${tier.title}
+                            <span class="tier-count">${props.length} picks</span>
+                        </div>
+                        <div class="tier-description">${tier.description}</div>
+                    </div>
+                    <div class="props-grid">
+                        ${props.map(player => renderPropCard(player)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    return html;
+}
+
+// Render props grouped by sport (fallback)
+function renderPropsBySport(allProps) {
+    let html = '';
+
     const groupedBySport = {};
     allProps.forEach(player => {
         const sport = player.sport || 'other';
@@ -576,101 +1011,103 @@ async function loadPlayerProps() {
         groupedBySport[sport].push(player);
     });
 
-    let html = '';
-
-    // Show comprehensive data source status
-    const lastUpdate = window.RosterService?.getLastUpdate();
-    const liveDataUpdate = window.LiveDataService?.getLastUpdate();
-    const rosterSource = window.RosterService?.getRosterSource() || 'unknown';
-    const dataSources = window.LiveDataService?.getDataSources() || {};
-
-    const oddsStatus = dataSources.odds === 'live' ? '✅ Live' : '⚠️ Demo';
-    const statsStatus = dataSources.stats === 'live' ? '✅ Live' : '⚠️ Cached';
-    const rosterStatus = rosterSource === 'espn_live' ? '✅ Live ESPN' : '📋 Verified';
-
-    const allLive = dataSources.odds === 'live' && dataSources.stats === 'live' && rosterSource === 'espn_live';
-    const sourceClass = allLive ? 'live' : 'fallback';
-
-    const updateTime = liveDataUpdate || lastUpdate;
-    const playerCount = window.RosterService?.playerTeams?.size || 0;
-    const oddsCount = window.LiveDataService?.liveOdds?.size || 0;
-
-    if (updateTime) {
-        html += `<div class="data-sources-banner ${sourceClass}">
-            <div class="data-sources-header">
-                <i class="fas fa-database"></i>
-                <strong>Data Sources</strong>
-                <span class="update-time">Last sync: ${updateTime.toLocaleTimeString()}</span>
-            </div>
-            <div class="data-sources-list">
-                <div class="source-item">
-                    <span class="source-label">Odds:</span>
-                    <span class="source-status">${oddsStatus}</span>
-                    <span class="source-detail">(${oddsCount} games)</span>
-                </div>
-                <div class="source-item">
-                    <span class="source-label">Rosters:</span>
-                    <span class="source-status">${rosterStatus}</span>
-                    <span class="source-detail">(${playerCount} players)</span>
-                </div>
-                <div class="source-item">
-                    <span class="source-label">Stats:</span>
-                    <span class="source-status">${statsStatus}</span>
-                </div>
-            </div>
-            <button onclick="refreshAllData()" class="btn btn-sm"><i class="fas fa-sync"></i> Refresh All</button>
-        </div>`;
-    }
-
     for (const sport of Object.keys(groupedBySport)) {
         const sportName = window.SPORT_MAPPINGS[sport]?.name || sport.toUpperCase();
         const sportIcon = getSportIcon(sport);
         const players = groupedBySport[sport];
 
         html += `<div class="props-sport-section">
-            <h3 class="props-sport-header"><i class="fas ${sportIcon}"></i> ${sportName} Player Props (${players.length} players)</h3>
+            <h3 class="props-sport-header"><i class="fas ${sportIcon}"></i> ${sportName} Player Props (${players.length} predictions)</h3>
             <div class="props-grid">`;
 
-        html += players.map(player => `
-            <div class="prop-card" data-sport="${sport}">
-                <div class="prop-header">
-                    <div class="prop-player-img">${getPlayerEmoji(player.position, sport)}</div>
-                    <div class="prop-player-info">
-                        <h3>${player.player}</h3>
-                        <div class="prop-player-team">${player.teamFull || player.team} • ${player.position || 'Player'}</div>
-                        <div class="prop-matchup">vs ${player.opponent}</div>
-                    </div>
-                    <div class="prop-sport-badge ${sport}">${sportName}</div>
-                </div>
-                <div class="prop-details">
-                    ${player.props.map(prop => `
-                        <div class="prop-item">
-                            <div>
-                                <div class="prop-type">${prop.type}</div>
-                                <div class="prop-line">Line: <strong>${roundLine(prop.line)}</strong></div>
-                                ${prop.bookLines ? `<div class="prop-book-lines">${generateBookLinesHtml(prop.bookLines)}</div>` : ''}
-                            </div>
-                            <div class="prop-prediction">
-                                <div class="prop-pick ${(prop.aiPick || 'over').toLowerCase()}">${prop.aiPick || 'Over'}</div>
-                                <div class="prop-probability">${prop.probability || 65}%</div>
-                            </div>
-                        </div>
-                        <div class="prop-bar">
-                            <div class="prop-bar-fill ${getConfidenceClass(prop.probability || 65)}" style="width: ${prop.probability || 65}%"></div>
-                        </div>
-                    `).join('')}
-                </div>
-                <div class="prop-books">
-                    ${generatePropBookBadges(player.books)}
-                </div>
-            </div>
-        `).join('');
+        html += players.map(player => renderPropCard(player)).join('');
 
         html += '</div></div>';
     }
 
-    container.innerHTML = html;
+    return html;
 }
+
+// Render a single prop card
+function renderPropCard(player) {
+    const prop = player.props?.[0] || {};
+    const overOdds = prop.overOdds || player.books || {};
+    const underOdds = prop.underOdds || {};
+
+    // Get AI prediction data
+    const aiPick = player.aiPick || prop.aiPick || 'OVER';
+    const confidence = player.confidence || prop.confidence || 65;
+    const reasoning = player.reasoning || prop.reasoning || '';
+    const trend = player.trend || prop.trend || 'NEUTRAL';
+    const seasonAvg = player.seasonAvg || prop.seasonAvg || prop.line;
+    const tier = player.tier || '';
+    const tierLabel = player.tierLabel || '';
+    const sport = player.sport || '';
+
+    const confidenceClass = confidence >= 70 ? 'high' : confidence >= 60 ? 'medium' : 'low';
+    const trendIcon = trend === 'UP' ? 'fa-arrow-up' : trend === 'DOWN' ? 'fa-arrow-down' : 'fa-minus';
+    const trendColor = trend === 'UP' ? 'success' : trend === 'DOWN' ? 'danger' : 'muted';
+
+    return `
+    <div class="prop-card ${tier.toLowerCase()}" data-sport="${sport}" data-tier="${tier}">
+        <div class="prop-header">
+            <div class="prop-player-img">${player.headshot ? `<img src="${player.headshot}" alt="">` : getPlayerEmoji(player.position, sport)}</div>
+            <div class="prop-player-info">
+                <h3>${player.player}</h3>
+                <div class="prop-player-team">${player.team} • ${player.position || 'Player'}</div>
+                <div class="prop-season-avg">
+                    <i class="fas ${trendIcon}" style="color: var(--${trendColor})"></i>
+                    Avg: ${seasonAvg}
+                </div>
+            </div>
+            <div class="prop-badges">
+                ${tierLabel ? `<span class="tier-badge ${tier.toLowerCase()}">${tierLabel}</span>` : ''}
+                <div class="prop-confidence-badge ${confidenceClass}">
+                    ${confidence}%
+                </div>
+            </div>
+        </div>
+
+        <!-- AI PREDICTION -->
+        <div class="ai-prediction-box ${aiPick.toLowerCase()}">
+            <div class="ai-pick-header">
+                <span class="ai-label">🤖 AI PICK</span>
+                <span class="ai-pick-value ${aiPick.toLowerCase()}">${aiPick}</span>
+            </div>
+            <div class="ai-pick-line">
+                <span class="prop-type">${player.propType || prop.type || 'Points'}</span>
+                <span class="line-value">${aiPick} ${roundLine(player.line || prop.line)}</span>
+            </div>
+            ${reasoning ? `<div class="ai-reasoning">${reasoning}</div>` : ''}
+        </div>
+
+        <!-- Sportsbook Odds -->
+        <div class="prop-odds-comparison">
+            <div class="odds-row ${aiPick === 'OVER' ? 'selected' : ''}">
+                <span class="direction">OVER</span>
+                <div class="books-odds">
+                    ${Object.entries(overOdds).slice(0, 4).map(([book, odds]) => `
+                        <span class="book-odd" title="${book}">
+                            <span class="book-abbr">${book.slice(0, 2).toUpperCase()}</span>
+                            <span class="odd-val ${odds > 0 ? 'plus' : ''}">${formatOddsValue(odds)}</span>
+                        </span>
+                    `).join('')}
+                </div>
+            </div>
+            <div class="odds-row ${aiPick === 'UNDER' ? 'selected' : ''}">
+                <span class="direction">UNDER</span>
+                <div class="books-odds">
+                    ${Object.entries(underOdds).slice(0, 4).map(([book, odds]) => `
+                        <span class="book-odd" title="${book}">
+                            <span class="book-abbr">${book.slice(0, 2).toUpperCase()}</span>
+                            <span class="odd-val ${odds > 0 ? 'plus' : ''}">${formatOddsValue(odds)}</span>
+                        </span>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    </div>
+`}
 
 // Refresh rosters manually
 async function refreshRosters() {
@@ -941,18 +1378,73 @@ async function loadLiveGames() {
 }
 
 function startAutoRefresh() {
+    // Clear any existing intervals
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    if (dataRefreshInterval) clearInterval(dataRefreshInterval);
+
+    // Live games refresh every 30 seconds
     autoRefreshInterval = setInterval(() => {
-        if (document.getElementById('live').classList.contains('active')) {
+        if (document.getElementById('live')?.classList.contains('active')) {
+            console.log('🔄 Auto-refreshing live games...');
             loadLiveGames();
         }
-    }, 30000);
+    }, LIVE_REFRESH_INTERVAL);
+
+    // Full data refresh every 5 minutes
+    dataRefreshInterval = setInterval(async () => {
+        console.log('🔄 Auto-refreshing all data (5-min interval)...');
+
+        // Clear cache to get fresh data
+        if (window.SportsAPI) {
+            window.SportsAPI.aggregatedData = {};
+        }
+
+        // Reload all data
+        await loadAllData();
+        updateLastUpdateTime();
+
+        // Show notification
+        if (window.ToastManager) {
+            window.ToastManager.info('Data Refreshed', 'All betting data has been updated.');
+        }
+    }, DATA_REFRESH_INTERVAL);
+
+    console.log('⏱️ Auto-refresh started: Live games every 30s, Full data every 5min');
 }
 
 function stopAutoRefresh() {
     if (autoRefreshInterval) {
         clearInterval(autoRefreshInterval);
         autoRefreshInterval = null;
+    }
+    if (dataRefreshInterval) {
+        clearInterval(dataRefreshInterval);
+        dataRefreshInterval = null;
+    }
+    console.log('⏱️ Auto-refresh stopped');
+}
+
+// Manual refresh function
+async function refreshAllData() {
+    console.log('🔄 Manual data refresh triggered...');
+
+    // Clear cache
+    if (window.SportsAPI) {
+        window.SportsAPI.aggregatedData = {};
+    }
+
+    // Show loading indicator
+    if (window.ToastManager) {
+        window.ToastManager.info('Refreshing...', 'Fetching latest betting data...');
+    }
+
+    // Reload all data
+    await loadAllData();
+    updateLastUpdateTime();
+
+    // Show success
+    if (window.ToastManager) {
+        window.ToastManager.success('Data Updated', 'All predictions refreshed with latest data.');
     }
 }
 
@@ -976,6 +1468,29 @@ function getSportIcon(sport) {
 function formatOdds(odds) {
     if (odds >= 0) return `+${odds}`;
     return odds.toString();
+}
+
+function formatOddsValue(odds) {
+    if (!odds && odds !== 0) return '--';
+    if (odds >= 0) return `+${odds}`;
+    return odds.toString();
+}
+
+function formatSpread(spread) {
+    if (!spread && spread !== 0) return '--';
+    if (spread > 0) return `+${spread}`;
+    return spread.toString();
+}
+
+function formatLine(line) {
+    if (!line && line !== 0) return '--';
+    if (line > 0) return `+${line}`;
+    return line.toString();
+}
+
+function roundLine(line) {
+    if (!line && line !== 0) return '--';
+    return Math.round(line * 2) / 2;
 }
 
 function formatGameTime(date) {
