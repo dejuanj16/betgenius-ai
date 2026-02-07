@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     initAppFilter();
     initThemeToggle();
     initPropsAppTabs();
+    initTierFilter();
     initConfidenceSlider();
     initEventListeners();
 
@@ -200,6 +201,72 @@ function initPropsAppTabs() {
             await loadPlayerProps();
         });
     });
+}
+
+// =====================================================
+// Tier Filter
+// =====================================================
+let currentTierFilter = 'all';
+
+function initTierFilter() {
+    const tierBtns = document.querySelectorAll('.tier-filter-btn');
+
+    tierBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            tierBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentTierFilter = this.getAttribute('data-tier');
+            filterTierSections();
+        });
+    });
+}
+
+function filterTierSections() {
+    const tierSections = document.querySelectorAll('.tier-section');
+    const tierMapping = {
+        'topPicks': 'tier-top',
+        'goodValue': 'tier-good',
+        'leans': 'tier-lean',
+        'risky': 'tier-risky'
+    };
+
+    tierSections.forEach(section => {
+        if (currentTierFilter === 'all') {
+            section.classList.remove('hidden');
+        } else {
+            const tierClass = tierMapping[currentTierFilter];
+            if (section.classList.contains(tierClass)) {
+                section.classList.remove('hidden');
+            } else {
+                section.classList.add('hidden');
+            }
+        }
+    });
+}
+
+function updateTierCounts(propsByTier) {
+    const counts = {
+        all: (propsByTier.topPicks?.length || 0) +
+             (propsByTier.goodValue?.length || 0) +
+             (propsByTier.leans?.length || 0) +
+             (propsByTier.risky?.length || 0),
+        top: propsByTier.topPicks?.length || 0,
+        good: propsByTier.goodValue?.length || 0,
+        lean: propsByTier.leans?.length || 0,
+        risky: propsByTier.risky?.length || 0
+    };
+
+    const countElements = {
+        all: document.getElementById('tierCountAll'),
+        top: document.getElementById('tierCountTop'),
+        good: document.getElementById('tierCountGood'),
+        lean: document.getElementById('tierCountLean'),
+        risky: document.getElementById('tierCountRisky')
+    };
+
+    for (const [key, el] of Object.entries(countElements)) {
+        if (el) el.textContent = counts[key];
+    }
 }
 
 // =====================================================
@@ -870,6 +937,12 @@ async function loadPlayerProps() {
     const sources = window.SportsAPI.getCurrentDataSourceStatus();
     const sourcesCount = sources.successful?.length || 0;
 
+    // Count unique players
+    const allPlayers = new Set();
+    [...allPropsByTier.topPicks, ...allPropsByTier.goodValue, ...allPropsByTier.leans, ...allPropsByTier.risky].forEach(p => {
+        allPlayers.add(p.player);
+    });
+
     html += `<div class="data-sources-banner live">
         <div class="data-sources-header">
             <i class="fas fa-database"></i>
@@ -879,11 +952,33 @@ async function loadPlayerProps() {
         <div class="data-sources-list">
             <div class="source-item">
                 <span class="source-label">Props:</span>
-                <span class="source-status">✅ ${totalProps} AI predictions from real stats</span>
+                <span class="source-status">✅ ${totalProps} AI predictions</span>
+            </div>
+            <div class="source-item">
+                <span class="source-label">Players:</span>
+                <span class="source-status">✅ ${allPlayers.size} players</span>
             </div>
             <div class="source-item">
                 <span class="source-label">Sources:</span>
-                <span class="source-status">✅ ${sourcesCount} official APIs</span>
+                <span class="source-status">✅ ${sourcesCount} APIs</span>
+            </div>
+        </div>
+        <div class="props-stats-summary">
+            <div class="stat-item top">
+                <span class="stat-number">${allPropsByTier.topPicks.length}</span>
+                <span class="stat-text">Top Picks</span>
+            </div>
+            <div class="stat-item good">
+                <span class="stat-number">${allPropsByTier.goodValue.length}</span>
+                <span class="stat-text">Good Value</span>
+            </div>
+            <div class="stat-item lean">
+                <span class="stat-number">${allPropsByTier.leans.length}</span>
+                <span class="stat-text">Leans</span>
+            </div>
+            <div class="stat-item risky">
+                <span class="stat-number">${allPropsByTier.risky.length}</span>
+                <span class="stat-text">Risky</span>
             </div>
         </div>
     </div>`;
@@ -903,6 +998,10 @@ async function loadPlayerProps() {
     }
 
     container.innerHTML = html;
+
+    // Update tier filter counts and apply current filter
+    updateTierCounts(allPropsByTier);
+    filterTierSections();
 }
 
 // Format a prop for display

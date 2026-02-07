@@ -228,6 +228,32 @@
                 <button class="prop-app-tab" data-app="draftkings">DraftKings</button>
                 <button class="prop-app-tab" data-app="fanduel">FanDuel</button>
             </div>
+
+            <!-- Tier Filter Buttons -->
+            <div class="tier-filter-bar" id="tierFilterBar">
+                <span class="tier-filter-label">Filter by Confidence:</span>
+                <button class="tier-filter-btn active" data-tier="all">
+                    <i class="fas fa-th"></i> All Props
+                    <span class="tier-count" id="tierCountAll">0</span>
+                </button>
+                <button class="tier-filter-btn top" data-tier="topPicks">
+                    <i class="fas fa-fire"></i> Top Picks
+                    <span class="tier-count" id="tierCountTop">0</span>
+                </button>
+                <button class="tier-filter-btn good" data-tier="goodValue">
+                    <i class="fas fa-check-circle"></i> Good Value
+                    <span class="tier-count" id="tierCountGood">0</span>
+                </button>
+                <button class="tier-filter-btn lean" data-tier="leans">
+                    <i class="fas fa-chart-line"></i> Leans
+                    <span class="tier-count" id="tierCountLean">0</span>
+                </button>
+                <button class="tier-filter-btn risky" data-tier="risky">
+                    <i class="fas fa-exclamation-triangle"></i> Risky
+                    <span class="tier-count" id="tierCountRisky">0</span>
+                </button>
+            </div>
+
             <div class="props-filters">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
@@ -239,9 +265,11 @@
                     <option value="rebounds">Rebounds</option>
                     <option value="assists">Assists</option>
                     <option value="threes">3-Pointers</option>
-                    <option value="pass_yds">Pass Yards</option>
-                    <option value="rush_yds">Rush Yards</option>
-                    <option value="rec_yds">Rec Yards</option>
+                    <option value="passing">Passing Yards</option>
+                    <option value="rushing">Rushing Yards</option>
+                    <option value="receiving">Receiving Yards</option>
+                    <option value="receptions">Receptions</option>
+                    <option value="td">Touchdowns</option>
                 </select>
             </div>
             <div class="props-grid" id="playerProps"></div>
