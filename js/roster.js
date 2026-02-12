@@ -4,6 +4,33 @@
 // Uses ESPN API for current rosters
 // =====================================================
 
+// PRIORITY ROSTER OVERRIDES - These players had recent trades that ESPN may not reflect yet
+// These will NOT be overwritten by ESPN data
+const PRIORITY_ROSTER_OVERRIDES = {
+    'James Harden': { team: 'Cleveland Cavaliers', abbr: 'CLE', position: 'PG', sport: 'nba' },
+    'Kevin Durant': { team: 'Houston Rockets', abbr: 'HOU', position: 'SF', sport: 'nba' },
+    'Trae Young': { team: 'Washington Wizards', abbr: 'WAS', position: 'PG', sport: 'nba', injured: true },
+    'Anthony Davis': { team: 'Washington Wizards', abbr: 'WAS', position: 'PF', sport: 'nba' },
+    'Darius Garland': { team: 'Los Angeles Clippers', abbr: 'LAC', position: 'PG', sport: 'nba' },
+    'Damian Lillard': { team: 'Portland Trail Blazers', abbr: 'POR', position: 'PG', sport: 'nba', injured: true },
+    'Jaren Jackson Jr.': { team: 'Utah Jazz', abbr: 'UTA', position: 'PF', sport: 'nba' },
+    'Ivica Zubac': { team: 'Indiana Pacers', abbr: 'IND', position: 'C', sport: 'nba' },
+    'Tyrese Haliburton': { team: 'Indiana Pacers', abbr: 'IND', position: 'PG', sport: 'nba', injured: true },
+    'Luka Doncic': { team: 'Los Angeles Lakers', abbr: 'LAL', position: 'PG', sport: 'nba' },
+    "De'Aaron Fox": { team: 'San Antonio Spurs', abbr: 'SAS', position: 'PG', sport: 'nba' },
+    'Jalen Green': { team: 'Phoenix Suns', abbr: 'PHX', position: 'SG', sport: 'nba' },
+    'Nikola Vučević': { team: 'Boston Celtics', abbr: 'BOS', position: 'C', sport: 'nba' },
+    'Nikola Vucevic': { team: 'Boston Celtics', abbr: 'BOS', position: 'C', sport: 'nba' },
+    'Jayson Tatum': { team: 'Boston Celtics', abbr: 'BOS', position: 'SF', sport: 'nba', injured: true },
+    'Anfernee Simons': { team: 'Chicago Bulls', abbr: 'CHI', position: 'SG', sport: 'nba' },
+    'Coby White': { team: 'Charlotte Hornets', abbr: 'CHA', position: 'PG', sport: 'nba' },
+    'Michael Porter Jr.': { team: 'Brooklyn Nets', abbr: 'BKN', position: 'SF', sport: 'nba' },
+    'Michael Porter': { team: 'Brooklyn Nets', abbr: 'BKN', position: 'SF', sport: 'nba' },
+    'Myles Turner': { team: 'Milwaukee Bucks', abbr: 'MIL', position: 'C', sport: 'nba' },
+    'Fred VanVleet': { team: 'Houston Rockets', abbr: 'HOU', position: 'PG', sport: 'nba', injured: true },
+    'Malik Beasley': { team: 'Free Agent', abbr: 'FA', position: 'SG', sport: 'nba', freeAgent: true }
+};
+
 class RosterService {
     constructor() {
         this.cache = new Map();
@@ -14,6 +41,11 @@ class RosterService {
         this.playerTeams = new Map();
         this.lastUpdate = null;
         this.rosterSource = 'loading';
+
+        // Pre-populate with priority overrides so ESPN can't overwrite them
+        Object.entries(PRIORITY_ROSTER_OVERRIDES).forEach(([player, info]) => {
+            this.playerTeams.set(player, { ...info, status: 'active', priority: true });
+        });
     }
 
     // =====================================================
@@ -195,6 +227,13 @@ class RosterService {
                     const playerName = athlete.displayName || athlete.fullName;
                     const position = athlete.position?.abbreviation || athlete.position?.name || '';
 
+                    // Skip players with priority overrides (recent trades not yet in ESPN)
+                    const existing = this.playerTeams.get(playerName);
+                    if (existing?.priority) {
+                        console.log(`🔒 Keeping priority roster for ${playerName}: ${existing.abbr} (ESPN has: ${teamAbbr})`);
+                        return; // Don't overwrite priority players
+                    }
+
                     this.playerTeams.set(playerName, {
                         team: teamName,
                         abbr: teamAbbr,
@@ -278,7 +317,7 @@ class RosterService {
         const nbaRosters = {
             // === LOS ANGELES LAKERS ===
             'LeBron James': { team: 'Los Angeles Lakers', abbr: 'LAL', position: 'SF' },
-            'Anthony Davis': { team: 'Los Angeles Lakers', abbr: 'LAL', position: 'PF/C' },
+            'Luka Doncic': { team: 'Los Angeles Lakers', abbr: 'LAL', position: 'PG' }, // TRADED 2025-26
             'Austin Reaves': { team: 'Los Angeles Lakers', abbr: 'LAL', position: 'SG' },
             "D'Angelo Russell": { team: 'Los Angeles Lakers', abbr: 'LAL', position: 'PG' },
             'Rui Hachimura': { team: 'Los Angeles Lakers', abbr: 'LAL', position: 'PF' },
@@ -297,10 +336,9 @@ class RosterService {
             'Payton Pritchard': { team: 'Boston Celtics', abbr: 'BOS', position: 'PG' },
             'Sam Hauser': { team: 'Boston Celtics', abbr: 'BOS', position: 'SF' },
 
-            // === DENVER NUGGETS ===
+// === DENVER NUGGETS ===
             'Nikola Jokic': { team: 'Denver Nuggets', abbr: 'DEN', position: 'C' },
             'Jamal Murray': { team: 'Denver Nuggets', abbr: 'DEN', position: 'PG' },
-            'Michael Porter Jr.': { team: 'Denver Nuggets', abbr: 'DEN', position: 'SF' },
             'Aaron Gordon': { team: 'Denver Nuggets', abbr: 'DEN', position: 'PF' },
             'Christian Braun': { team: 'Denver Nuggets', abbr: 'DEN', position: 'SG' },
             'Julian Strawther': { team: 'Denver Nuggets', abbr: 'DEN', position: 'SG' },
@@ -319,7 +357,7 @@ class RosterService {
             // Note: Klay Thompson is on Dallas Mavericks now
 
             // === DALLAS MAVERICKS ===
-            'Luka Doncic': { team: 'Dallas Mavericks', abbr: 'DAL', position: 'PG' },
+            // Note: Luka Doncic traded to Lakers 2025-26
             'Kyrie Irving': { team: 'Dallas Mavericks', abbr: 'DAL', position: 'SG' },
             'Klay Thompson': { team: 'Dallas Mavericks', abbr: 'DAL', position: 'SG' }, // Signed 2024
             'P.J. Washington': { team: 'Dallas Mavericks', abbr: 'DAL', position: 'PF' },
@@ -348,7 +386,7 @@ class RosterService {
             // Note: Karl-Anthony Towns traded to Knicks
 
             // === PHOENIX SUNS ===
-            'Kevin Durant': { team: 'Phoenix Suns', abbr: 'PHX', position: 'SF' },
+            // Note: Kevin Durant traded to Houston 2025-26
             'Devin Booker': { team: 'Phoenix Suns', abbr: 'PHX', position: 'SG' },
             'Bradley Beal': { team: 'Phoenix Suns', abbr: 'PHX', position: 'SG' },
             'Jusuf Nurkic': { team: 'Phoenix Suns', abbr: 'PHX', position: 'C' },
@@ -366,7 +404,7 @@ class RosterService {
 
             // === MILWAUKEE BUCKS ===
             'Giannis Antetokounmpo': { team: 'Milwaukee Bucks', abbr: 'MIL', position: 'PF' },
-            'Damian Lillard': { team: 'Milwaukee Bucks', abbr: 'MIL', position: 'PG' },
+            // Note: Damian Lillard traded back to Portland 2025-26
             'Khris Middleton': { team: 'Milwaukee Bucks', abbr: 'MIL', position: 'SF' },
             'Brook Lopez': { team: 'Milwaukee Bucks', abbr: 'MIL', position: 'C' },
             'Bobby Portis': { team: 'Milwaukee Bucks', abbr: 'MIL', position: 'PF' },
@@ -382,11 +420,12 @@ class RosterService {
 
             // === CLEVELAND CAVALIERS ===
             'Donovan Mitchell': { team: 'Cleveland Cavaliers', abbr: 'CLE', position: 'SG' },
-            'Darius Garland': { team: 'Cleveland Cavaliers', abbr: 'CLE', position: 'PG' },
+            'James Harden': { team: 'Cleveland Cavaliers', abbr: 'CLE', position: 'PG' }, // TRADED 2025-26
             'Evan Mobley': { team: 'Cleveland Cavaliers', abbr: 'CLE', position: 'PF' },
             'Jarrett Allen': { team: 'Cleveland Cavaliers', abbr: 'CLE', position: 'C' },
             'Max Strus': { team: 'Cleveland Cavaliers', abbr: 'CLE', position: 'SG' },
             'Isaac Okoro': { team: 'Cleveland Cavaliers', abbr: 'CLE', position: 'SF' },
+            // Note: Darius Garland traded to LA Clippers 2025-26
 
             // === PHILADELPHIA 76ERS ===
             'Joel Embiid': { team: 'Philadelphia 76ers', abbr: 'PHI', position: 'C' },
@@ -396,21 +435,22 @@ class RosterService {
             'Kelly Oubre Jr.': { team: 'Philadelphia 76ers', abbr: 'PHI', position: 'SF' },
 
             // === LOS ANGELES CLIPPERS ===
-            'James Harden': { team: 'Los Angeles Clippers', abbr: 'LAC', position: 'PG' },
+            'Darius Garland': { team: 'Los Angeles Clippers', abbr: 'LAC', position: 'PG' }, // TRADED 2025-26 from Cleveland
             'Kawhi Leonard': { team: 'Los Angeles Clippers', abbr: 'LAC', position: 'SF' },
             'Norman Powell': { team: 'Los Angeles Clippers', abbr: 'LAC', position: 'SG' },
-            'Ivica Zubac': { team: 'Los Angeles Clippers', abbr: 'LAC', position: 'C' },
+            // Note: Ivica Zubac traded to Indiana 2025-26
             'Terance Mann': { team: 'Los Angeles Clippers', abbr: 'LAC', position: 'SG' },
             // Note: Paul George signed with 76ers
+            // Note: James Harden traded to Cleveland 2025-26
 
             // === MEMPHIS GRIZZLIES ===
             'Ja Morant': { team: 'Memphis Grizzlies', abbr: 'MEM', position: 'PG' },
             'Desmond Bane': { team: 'Memphis Grizzlies', abbr: 'MEM', position: 'SG' },
-            'Jaren Jackson Jr.': { team: 'Memphis Grizzlies', abbr: 'MEM', position: 'PF' },
+            // Note: Jaren Jackson Jr. traded to Utah 2025-26
             'Marcus Smart': { team: 'Memphis Grizzlies', abbr: 'MEM', position: 'PG' },
 
             // === SACRAMENTO KINGS ===
-            'De\'Aaron Fox': { team: 'Sacramento Kings', abbr: 'SAC', position: 'PG' },
+            // Note: De'Aaron Fox traded to San Antonio 2025-26
             'Domantas Sabonis': { team: 'Sacramento Kings', abbr: 'SAC', position: 'C' },
             'DeMar DeRozan': { team: 'Sacramento Kings', abbr: 'SAC', position: 'SF' }, // Signed 2024
             'Keegan Murray': { team: 'Sacramento Kings', abbr: 'SAC', position: 'SF' },
@@ -431,6 +471,7 @@ class RosterService {
             // === INDIANA PACERS ===
             'Tyrese Haliburton': { team: 'Indiana Pacers', abbr: 'IND', position: 'PG' },
             'Pascal Siakam': { team: 'Indiana Pacers', abbr: 'IND', position: 'PF' },
+            'Ivica Zubac': { team: 'Indiana Pacers', abbr: 'IND', position: 'C' }, // TRADED 2025-26 from LAC
             'Myles Turner': { team: 'Indiana Pacers', abbr: 'IND', position: 'C' },
             'Bennedict Mathurin': { team: 'Indiana Pacers', abbr: 'IND', position: 'SG' },
 
@@ -456,6 +497,7 @@ class RosterService {
             // Note: Mikal Bridges traded to Knicks
 
             // === HOUSTON ROCKETS ===
+            'Kevin Durant': { team: 'Houston Rockets', abbr: 'HOU', position: 'SF' }, // TRADED 2025-26 from Phoenix
             'Jalen Green': { team: 'Houston Rockets', abbr: 'HOU', position: 'SG' },
             'Alperen Sengun': { team: 'Houston Rockets', abbr: 'HOU', position: 'C' },
             'Jabari Smith Jr.': { team: 'Houston Rockets', abbr: 'HOU', position: 'PF' },
@@ -464,6 +506,7 @@ class RosterService {
 
             // === SAN ANTONIO SPURS ===
             'Victor Wembanyama': { team: 'San Antonio Spurs', abbr: 'SAS', position: 'C' },
+            "De'Aaron Fox": { team: 'San Antonio Spurs', abbr: 'SAS', position: 'PG' }, // TRADED 2025-26 from Sacramento
             'Devin Vassell': { team: 'San Antonio Spurs', abbr: 'SAS', position: 'SG' },
             'Jeremy Sochan': { team: 'San Antonio Spurs', abbr: 'SAS', position: 'SF' },
             'Keldon Johnson': { team: 'San Antonio Spurs', abbr: 'SAS', position: 'SF' },
@@ -472,6 +515,7 @@ class RosterService {
 
             // === UTAH JAZZ ===
             'Lauri Markkanen': { team: 'Utah Jazz', abbr: 'UTA', position: 'PF' },
+            'Jaren Jackson Jr.': { team: 'Utah Jazz', abbr: 'UTA', position: 'PF' }, // TRADED 2025-26 from Memphis
             'Jordan Clarkson': { team: 'Utah Jazz', abbr: 'UTA', position: 'SG' },
             'Collin Sexton': { team: 'Utah Jazz', abbr: 'UTA', position: 'PG' },
             'John Collins': { team: 'Utah Jazz', abbr: 'UTA', position: 'PF' },
@@ -483,6 +527,8 @@ class RosterService {
             'Mark Williams': { team: 'Charlotte Hornets', abbr: 'CHA', position: 'C' },
 
             // === WASHINGTON WIZARDS ===
+            'Trae Young': { team: 'Washington Wizards', abbr: 'WAS', position: 'PG' }, // TRADED 2025-26 from Atlanta
+            'Anthony Davis': { team: 'Washington Wizards', abbr: 'WAS', position: 'PF' }, // TRADED 2025-26 from LAL
             'Kyle Kuzma': { team: 'Washington Wizards', abbr: 'WAS', position: 'PF' },
             'Jordan Poole': { team: 'Washington Wizards', abbr: 'WAS', position: 'SG' },
             'Bilal Coulibaly': { team: 'Washington Wizards', abbr: 'WAS', position: 'SF' },
@@ -495,13 +541,14 @@ class RosterService {
             'Jalen Duren': { team: 'Detroit Pistons', abbr: 'DET', position: 'C' },
 
             // === PORTLAND TRAIL BLAZERS ===
+            'Damian Lillard': { team: 'Portland Trail Blazers', abbr: 'POR', position: 'PG' }, // TRADED BACK 2025-26 from Milwaukee (Injured)
             'Anfernee Simons': { team: 'Portland Trail Blazers', abbr: 'POR', position: 'SG' },
             'Scoot Henderson': { team: 'Portland Trail Blazers', abbr: 'POR', position: 'PG' },
             'Jerami Grant': { team: 'Portland Trail Blazers', abbr: 'POR', position: 'SF' },
             'Deandre Ayton': { team: 'Portland Trail Blazers', abbr: 'POR', position: 'C' },
 
             // === ATLANTA HAWKS ===
-            'Trae Young': { team: 'Atlanta Hawks', abbr: 'ATL', position: 'PG' },
+            // Note: Trae Young traded to Washington 2025-26
             'Jalen Johnson': { team: 'Atlanta Hawks', abbr: 'ATL', position: 'SF' },
             'De\'Andre Hunter': { team: 'Atlanta Hawks', abbr: 'ATL', position: 'SF' },
             'Clint Capela': { team: 'Atlanta Hawks', abbr: 'ATL', position: 'C' },
@@ -509,6 +556,9 @@ class RosterService {
         };
 
         Object.entries(nbaRosters).forEach(([player, info]) => {
+            // Skip priority players (already set in constructor)
+            const existing = this.playerTeams.get(player);
+            if (existing?.priority) return;
             this.playerTeams.set(player, { ...info, sport: 'nba', status: 'active' });
         });
 

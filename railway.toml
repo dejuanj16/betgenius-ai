@@ -1,0 +1,14 @@
+# Railway Configuration for BetGenius AI
+# =====================================================
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "node server.js"
+healthcheckPath = "/health"
+healthcheckTimeout = 100
+
+[env]
+PORT = "3001"
+NODE_ENV = "production"

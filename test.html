@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BetGenius Test</title>
+    <style>
+        body { background: #111; color: #fff; font-family: Arial, sans-serif; padding: 20px; }
+        .prop { background: #222; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #00ff88; }
+        .prop h3 { margin: 0 0 5px 0; color: #00ff88; }
+        .prop p { margin: 5px 0; color: #aaa; }
+        .confidence { display: inline-block; background: #00ff88; color: #000; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
+        h1 { color: #00ff88; }
+        .loading { color: #fbbf24; }
+        .success { color: #00ff88; }
+        .error { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <h1>🏀 BetGenius AI - Test Page</h1>
+    <p id="status" class="loading">Loading...</p>
+    <div id="props"></div>
+
+    <script src="js/demoData.js"></script>
+    <script src="js/liveOdds.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async function() {
+            const statusEl = document.getElementById('status');
+            const propsEl = document.getElementById('props');
+
+            try {
+                // Test 1: Check if demo data loaded
+                if (window.getDemoProps) {
+                    statusEl.innerHTML = '✅ Demo data loaded! ';
+                    statusEl.className = 'success';
+
+                    const demoProps = window.getDemoProps('all');
+                    statusEl.innerHTML += `Found ${demoProps.length} demo props. `;
+
+                    // Show first 5 props
+                    demoProps.slice(0, 10).forEach(prop => {
+                        propsEl.innerHTML += `
+                            <div class="prop">
+                                <h3>${prop.player} - ${prop.propType}</h3>
+                                <p><strong>${prop.pick}</strong> ${prop.line} | <span class="confidence">${prop.confidence}%</span></p>
+                                <p>${prop.reasoning || 'No reasoning'}</p>
+                            </div>
+                        `;
+                    });
+                } else {
+                    statusEl.innerHTML = '❌ Demo data NOT loaded';
+                    statusEl.className = 'error';
+                }
+
+                // Test 2: Try to fetch live ESPN odds
+                if (window.LiveOddsFetcher) {
+                    statusEl.innerHTML += '<br>🎯 Fetching live ESPN odds...';
+                    const games = await window.LiveOddsFetcher.fetchLiveOdds('nba');
+                    statusEl.innerHTML += `<br>✅ Got ${games.length} NBA games from ESPN`;
+
+                    games.slice(0, 3).forEach(game => {
+                        propsEl.innerHTML += `
+                            <div class="prop" style="border-left-color: #3b82f6;">
+                                <h3>🏀 ${game.awayTeam?.name || 'Away'} @ ${game.homeTeam?.name || 'Home'}</h3>
+                                <p>Spread: ${game.odds?.spread || 'N/A'} | Total: ${game.odds?.total || 'N/A'}</p>
+                                <p>ML: ${game.awayTeam?.abbreviation} ${game.odds?.awayMoneyline || '--'} | ${game.homeTeam?.abbreviation} ${game.odds?.homeMoneyline || '--'}</p>
+                            </div>
+                        `;
+                    });
+                }
+
+            } catch (error) {
+                statusEl.innerHTML = '❌ Error: ' + error.message;
+                statusEl.className = 'error';
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -3,21 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BetGenius AI - Smart Sports Betting Assistant</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <title>BetGenius AI - Player Props Assistant</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#00ff88">
+    <meta name="description" content="AI-powered sports betting assistant with real-time odds and player props">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BetGenius">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- iOS Icons -->
+    <link rel="apple-touch-icon" href="icons/icon-152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192.png">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16.png">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/styles.css?v=9">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Force page to show even if scripts fail -->
+    <script>
+        // Failsafe: Show content after 3 seconds no matter what
+        setTimeout(function() {
+            var overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.style.display = 'none';
+                overlay.classList.add('hidden');
+            }
+            document.body.style.visibility = 'visible';
+        }, 3000);
+    </script>
 </head>
 <body>
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <!-- Data Source Status Banner -->
-    <div class="data-source-banner" id="dataSourceBanner" style="display: none;">
+    <!-- Server Connection Banner -->
+    <div class="server-connection-banner" id="serverConnectionBanner" style="display: none;">
         <div class="banner-content">
-            <i class="fas fa-info-circle"></i>
-            <span id="bannerMessage">Some data sources are limited</span>
-            <button class="banner-close" onclick="this.parentElement.parentElement.style.display='none'">
+            <i class="fas fa-exclamation-circle"></i>
+            <span id="serverBannerText">Cannot connect to proxy server. Run: <code>node server.js</code></span>
+            <button class="banner-retry-btn" onclick="window.retryConnection && window.retryConnection()">
+                <i class="fas fa-sync-alt"></i> Retry
+            </button>
+            <button class="banner-close-btn" onclick="this.parentElement.parentElement.style.display='none'">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -27,7 +63,7 @@
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner">
             <i class="fas fa-brain fa-spin"></i>
-            <p>Loading live data...</p>
+            <p>Loading player props...</p>
         </div>
     </div>
 
@@ -39,13 +75,17 @@
                 <span>BetGenius<span class="ai-badge">AI</span></span>
             </div>
             <ul class="nav-links">
-                <li><a href="#dashboard" class="active" data-page="dashboard"><i class="fas fa-chart-line"></i> Dashboard</a></li>
-                <li><a href="#odds" data-page="odds"><i class="fas fa-balance-scale"></i> Best Odds</a></li>
-                <li><a href="#props" data-page="props"><i class="fas fa-user"></i> Player Props</a></li>
-                <li><a href="#predictions" data-page="predictions"><i class="fas fa-brain"></i> Predictions</a></li>
-                <li><a href="#live" data-page="live"><i class="fas fa-broadcast-tower"></i> Live</a></li>
+                <li><a href="#props" class="active" data-page="props"><i class="fas fa-user"></i> Player Props</a></li>
+                <li><a href="#live" data-page="live"><i class="fas fa-broadcast-tower"></i> Live Games</a></li>
+                <li><a href="#tracker" data-page="tracker"><i class="fas fa-chart-line"></i> Tracker</a></li>
             </ul>
             <div class="nav-actions">
+                <button class="btn btn-icon notification-toggle" id="notificationToggleBtn" title="Enable Notifications">
+                    <i class="fas fa-bell"></i>
+                </button>
+                <button class="btn btn-icon parlay-toggle" id="parlayToggleBtn" title="Parlay Builder">
+                    <i class="fas fa-layer-group"></i> Parlay
+                </button>
                 <button class="btn btn-icon" id="refreshBtn" title="Refresh Data">
                     <i class="fas fa-sync-alt"></i>
                 </button>
@@ -70,20 +110,11 @@
                 <button class="sport-btn" data-sport="nba">
                     <i class="fas fa-basketball-ball"></i> <span>NBA</span>
                 </button>
-                <button class="sport-btn" data-sport="nfl">
-                    <i class="fas fa-football-ball"></i> <span>NFL</span>
-                </button>
-                <button class="sport-btn" data-sport="mlb">
-                    <i class="fas fa-baseball-ball"></i> <span>MLB</span>
-                </button>
                 <button class="sport-btn" data-sport="nhl">
                     <i class="fas fa-hockey-puck"></i> <span>NHL</span>
                 </button>
                 <button class="sport-btn" data-sport="ncaab">
                     <i class="fas fa-basketball-ball"></i> <span>NCAAB</span>
-                </button>
-                <button class="sport-btn" data-sport="ncaaf">
-                    <i class="fas fa-football-ball"></i> <span>NCAAF</span>
                 </button>
                 <button class="sport-btn" data-sport="soccer">
                     <i class="fas fa-futbol"></i> <span>Soccer</span>
@@ -91,142 +122,29 @@
                 <button class="sport-btn" data-sport="mma">
                     <i class="fas fa-fist-raised"></i> <span>MMA</span>
                 </button>
+                <!-- Offseason sports (hidden) -->
+                <!-- NFL, MLB, NCAAF are currently in offseason - will be enabled when season starts -->
             </div>
         </div>
 
-        <!-- Betting App Filter Bar -->
-        <div class="betting-app-filter">
-            <div class="filter-container">
-                <span class="filter-label">Filter by App:</span>
-                <button class="app-btn active" data-app="all">All Apps</button>
-                <button class="app-btn prizepicks" data-app="prizepicks">PrizePicks</button>
-                <button class="app-btn draftkings" data-app="draftkings">DraftKings</button>
-                <button class="app-btn fanduel" data-app="fanduel">FanDuel</button>
-                <button class="app-btn sleeper" data-app="sleeper">Sleeper</button>
-                <button class="app-btn underdog" data-app="underdog">Underdog</button>
-                <button class="app-btn betr" data-app="betr">Betr</button>
-            </div>
-        </div>
-
-        <!-- Dashboard Page -->
-        <section id="dashboard" class="page active">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon green"><i class="fas fa-chart-line"></i></div>
-                    <div class="stat-info">
-                        <span class="stat-value" id="aiAccuracy">73.2%</span>
-                        <span class="stat-label">AI Accuracy</span>
-                    </div>
-                    <div class="stat-trend up"><i class="fas fa-arrow-up"></i> +2.4%</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon blue"><i class="fas fa-calendar-day"></i></div>
-                    <div class="stat-info">
-                        <span class="stat-value" id="gamesToday">--</span>
-                        <span class="stat-label">Games Today</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon purple"><i class="fas fa-fire"></i></div>
-                    <div class="stat-info">
-                        <span class="stat-value" id="hotPicks">--</span>
-                        <span class="stat-label">Hot Picks</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon orange"><i class="fas fa-bolt"></i></div>
-                    <div class="stat-info">
-                        <span class="stat-value" id="liveGamesCount">--</span>
-                        <span class="stat-label">Live Now</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="data-source-banner" id="dataSourceBanner">
-                <i class="fas fa-signal"></i>
-                <span id="dataSourceText">Live data from ESPN & The Odds API</span>
-                <span class="last-update">Updated: <span id="lastUpdateTime">--</span></span>
-            </div>
-
-            <div class="ai-insights-banner">
-                <div class="ai-icon"><i class="fas fa-robot"></i></div>
-                <div class="ai-message">
-                    <h3>AI Insight</h3>
-                    <p id="aiInsightText">Analyzing trends across all betting platforms...</p>
-                </div>
-                <button class="btn btn-outline" id="refreshInsight"><i class="fas fa-sync-alt"></i> Refresh</button>
-            </div>
-
-            <div class="section">
-                <div class="section-header">
-                    <h2><i class="fas fa-star"></i> Top AI Picks</h2>
-                    <a href="#" class="view-all" data-page="predictions">View All <i class="fas fa-arrow-right"></i></a>
-                </div>
-                <div class="picks-grid" id="topPicks"></div>
-            </div>
-
-            <div class="section">
-                <div class="section-header">
-                    <h2><i class="fas fa-clock"></i> Upcoming Games</h2>
-                    <div class="time-filter">
-                        <button class="time-btn active" data-time="today">Today</button>
-                        <button class="time-btn" data-time="tomorrow">Tomorrow</button>
-                    </div>
-                </div>
-                <div class="games-list" id="upcomingGames"></div>
-            </div>
-        </section>
-
-        <!-- Best Odds Page -->
-        <section id="odds" class="page">
-            <div class="page-header">
-                <h1><i class="fas fa-balance-scale"></i> Best Odds Comparison</h1>
-                <p>Real-time odds from DraftKings, FanDuel, BetMGM, Caesars & more</p>
-            </div>
-            <div class="odds-filters">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Search teams..." id="oddsSearch">
-                </div>
-                <select class="filter-select" id="betTypeFilter">
-                    <option value="all">All Bet Types</option>
-                    <option value="spreads">Spread</option>
-                    <option value="h2h">Moneyline</option>
-                    <option value="totals">Over/Under</option>
-                </select>
-            </div>
-            <div class="odds-table-container">
-                <table class="odds-table" id="oddsTable">
-                    <thead>
-                        <tr>
-                            <th>Game</th>
-                            <th>Type</th>
-                            <th class="book-col">DraftKings</th>
-                            <th class="book-col">FanDuel</th>
-                            <th class="book-col">BetMGM</th>
-                            <th class="book-col">Caesars</th>
-                            <th>Best</th>
-                        </tr>
-                    </thead>
-                    <tbody id="oddsTableBody"></tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- Player Props Page -->
-        <section id="props" class="page">
+        <!-- Player Props Page (Main) -->
+        <section id="props" class="page active">
             <div class="page-header">
                 <h1><i class="fas fa-user"></i> Player Props</h1>
-                <p>Compare lines across PrizePicks, Underdog, Sleeper, DraftKings & more</p>
+                <p>AI-analyzed player props with real-time odds from DraftKings, FanDuel & more</p>
             </div>
-            <div class="props-app-tabs">
-                <button class="prop-app-tab active" data-app="all">All Apps</button>
-                <button class="prop-app-tab" data-app="prizepicks">PrizePicks</button>
-                <button class="prop-app-tab" data-app="underdog">Underdog</button>
-                <button class="prop-app-tab" data-app="sleeper">Sleeper</button>
-                <button class="prop-app-tab" data-app="betr">Betr</button>
-                <button class="prop-app-tab" data-app="draftkings">DraftKings</button>
-                <button class="prop-app-tab" data-app="fanduel">FanDuel</button>
+
+            <!-- TODAY'S SCHEDULE - FIRST THING VISIBLE -->
+            <div id="todaysScheduleContainer" class="todays-games-section" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 3px solid #00ff88; padding: 1.25rem; margin-bottom: 1.5rem; border-radius: 12px; box-shadow: 0 0 30px rgba(0,255,136,0.3);">
+                <h3 style="color: #00ff88; font-size: 1.3rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-calendar-day"></i> 📅 TODAY'S GAMES
+                    <span id="scheduleLoadingSpinner" style="font-size: 0.9rem; margin-left: auto;"><i class="fas fa-spinner fa-spin"></i> Loading...</span>
+                </h3>
+                <div id="scheduleGamesGrid" class="games-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+                    <div style="color: #aaa; padding: 1rem; background: rgba(0,255,136,0.1); border-radius: 8px; text-align: center;">
+                        <i class="fas fa-sync fa-spin" style="margin-right: 0.5rem;"></i> Fetching live schedule from ESPN...
+                    </div>
+                </div>
             </div>
 
             <!-- Tier Filter Buttons -->
@@ -237,19 +155,19 @@
                     <span class="tier-count" id="tierCountAll">0</span>
                 </button>
                 <button class="tier-filter-btn top" data-tier="topPicks">
-                    <i class="fas fa-fire"></i> Top Picks
+                    <i class="fas fa-fire"></i> Top Picks (75%+)
                     <span class="tier-count" id="tierCountTop">0</span>
                 </button>
                 <button class="tier-filter-btn good" data-tier="goodValue">
-                    <i class="fas fa-check-circle"></i> Good Value
+                    <i class="fas fa-check-circle"></i> Good Value (65-74%)
                     <span class="tier-count" id="tierCountGood">0</span>
                 </button>
                 <button class="tier-filter-btn lean" data-tier="leans">
-                    <i class="fas fa-chart-line"></i> Leans
+                    <i class="fas fa-chart-line"></i> Leans (55-64%)
                     <span class="tier-count" id="tierCountLean">0</span>
                 </button>
                 <button class="tier-filter-btn risky" data-tier="risky">
-                    <i class="fas fa-exclamation-triangle"></i> Risky
+                    <i class="fas fa-exclamation-triangle"></i> Risky (&lt;55%)
                     <span class="tier-count" id="tierCountRisky">0</span>
                 </button>
             </div>
@@ -260,42 +178,56 @@
                     <input type="text" placeholder="Search players..." id="playerSearch">
                 </div>
                 <select class="filter-select" id="propTypeFilter">
-                    <option value="all">All Props</option>
-                    <option value="points">Points</option>
-                    <option value="rebounds">Rebounds</option>
-                    <option value="assists">Assists</option>
-                    <option value="threes">3-Pointers</option>
-                    <option value="passing">Passing Yards</option>
-                    <option value="rushing">Rushing Yards</option>
-                    <option value="receiving">Receiving Yards</option>
-                    <option value="receptions">Receptions</option>
-                    <option value="td">Touchdowns</option>
+                    <option value="all">All Prop Types</option>
+                    <optgroup label="Basketball">
+                        <option value="points">Points</option>
+                        <option value="rebounds">Rebounds</option>
+                        <option value="assists">Assists</option>
+                        <option value="threes">3-Pointers</option>
+                        <option value="steals">Steals</option>
+                        <option value="blocks">Blocks</option>
+                    </optgroup>
+                    <optgroup label="Football">
+                        <option value="passing">Passing Yards</option>
+                        <option value="rushing">Rushing Yards</option>
+                        <option value="receiving">Receiving Yards</option>
+                        <option value="receptions">Receptions</option>
+                        <option value="td">Touchdowns</option>
+                    </optgroup>
+                    <optgroup label="Baseball">
+                        <option value="strikeouts">Strikeouts</option>
+                        <option value="hits">Hits</option>
+                        <option value="rbi">RBIs</option>
+                    </optgroup>
+                    <optgroup label="Hockey">
+                        <option value="goals">Goals</option>
+                        <option value="saves">Saves</option>
+                        <option value="shots">Shots on Goal</option>
+                    </optgroup>
+                </select>
+                <select class="filter-select" id="bookFilter">
+                    <option value="all">All Sportsbooks</option>
+                    <option value="draftkings">DraftKings</option>
+                    <option value="fanduel">FanDuel</option>
+                    <option value="betmgm">BetMGM</option>
+                    <option value="caesars">Caesars</option>
                 </select>
             </div>
-            <div class="props-grid" id="playerProps"></div>
-        </section>
 
-        <!-- Predictions Page -->
-        <section id="predictions" class="page">
-            <div class="page-header">
-                <h1><i class="fas fa-brain"></i> AI Game Predictions</h1>
-                <p>ML models analyze historical data, matchups, and real-time odds</p>
+            <div class="data-sources-banner" id="dataSourcesBanner">
+                <i class="fas fa-signal"></i>
+                <span id="dataSourceText">Fetching live props...</span>
+                <span class="last-update">Updated: <span id="lastUpdateTime">--</span></span>
             </div>
-            <div class="predictions-filters">
-                <div class="confidence-filter">
-                    <label>Min Confidence:</label>
-                    <input type="range" min="50" max="95" value="60" id="confidenceSlider">
-                    <span id="confidenceValue">60%</span>
-                </div>
-            </div>
-            <div class="predictions-list" id="predictionsList"></div>
+
+            <div class="props-grid" id="playerProps"></div>
         </section>
 
         <!-- Live Page -->
         <section id="live" class="page">
             <div class="page-header">
                 <h1><i class="fas fa-broadcast-tower"></i> Live Games</h1>
-                <p>Real-time scores and live odds updates</p>
+                <p>Real-time scores for today's games</p>
             </div>
             <div class="live-controls">
                 <label class="auto-refresh">
@@ -306,24 +238,266 @@
             </div>
             <div class="live-games-grid" id="liveGames"></div>
         </section>
+
+        <!-- Tracker Page -->
+        <section id="tracker" class="page">
+            <div class="page-header">
+                <h1><i class="fas fa-chart-line"></i> Betting Tracker</h1>
+                <p>Track your bets, ROI, and performance over time</p>
+            </div>
+
+            <!-- Tracker Stats Overview -->
+            <div class="tracker-stats" id="trackerStats">
+                <div class="stat-card bankroll">
+                    <div class="stat-icon"><i class="fas fa-wallet"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-label">Bankroll</span>
+                        <span class="stat-value" id="statBankroll">$1,000.00</span>
+                        <span class="stat-change positive" id="statBankrollChange">+$0.00</span>
+                    </div>
+                </div>
+                <div class="stat-card roi">
+                    <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-label">ROI</span>
+                        <span class="stat-value" id="statROI">0%</span>
+                    </div>
+                </div>
+                <div class="stat-card wins">
+                    <div class="stat-icon"><i class="fas fa-trophy"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-label">Win Rate</span>
+                        <span class="stat-value" id="statWinRate">0%</span>
+                        <span class="stat-detail" id="statRecord">0-0</span>
+                    </div>
+                </div>
+                <div class="stat-card streak">
+                    <div class="stat-icon"><i class="fas fa-fire"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-label">Streak</span>
+                        <span class="stat-value" id="statStreak">--</span>
+                    </div>
+                </div>
+                <div class="stat-card pending">
+                    <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-label">Pending</span>
+                        <span class="stat-value" id="statPending">0</span>
+                        <span class="stat-detail" id="statPendingAmount">$0 at risk</span>
+                    </div>
+                </div>
+                <div class="stat-card ai-accuracy">
+                    <div class="stat-icon"><i class="fas fa-brain"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-label">AI Accuracy</span>
+                        <span class="stat-value" id="statAIAccuracy">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tracker Actions -->
+            <div class="tracker-actions">
+                <button class="btn btn-primary" id="addBetBtn">
+                    <i class="fas fa-plus"></i> Add Bet
+                </button>
+                <button class="btn btn-outline" id="setBankrollBtn">
+                    <i class="fas fa-wallet"></i> Set Bankroll
+                </button>
+                <button class="btn btn-outline" id="exportBetsBtn">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+
+            <!-- Tracker Tabs -->
+            <div class="tracker-tabs">
+                <button class="tracker-tab active" data-tab="pending">
+                    <i class="fas fa-clock"></i> Pending <span class="tab-count" id="pendingCount">0</span>
+                </button>
+                <button class="tracker-tab" data-tab="history">
+                    <i class="fas fa-history"></i> History
+                </button>
+                <button class="tracker-tab" data-tab="analytics">
+                    <i class="fas fa-chart-bar"></i> Analytics
+                </button>
+            </div>
+
+            <!-- Pending Bets -->
+            <div class="tracker-content" id="trackerPending">
+                <div class="bets-list" id="pendingBetsList">
+                    <div class="empty-state">
+                        <i class="fas fa-receipt"></i>
+                        <p>No pending bets</p>
+                        <span>Add bets from the Player Props page</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bet History -->
+            <div class="tracker-content hidden" id="trackerHistory">
+                <div class="bets-list" id="historyBetsList">
+                    <div class="empty-state">
+                        <i class="fas fa-history"></i>
+                        <p>No bet history yet</p>
+                        <span>Settled bets will appear here</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics -->
+            <div class="tracker-content hidden" id="trackerAnalytics">
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <h3><i class="fas fa-basketball-ball"></i> By Sport</h3>
+                        <div class="analytics-breakdown" id="analyticsBySport"></div>
+                    </div>
+                    <div class="analytics-card">
+                        <h3><i class="fas fa-chart-pie"></i> By Prop Type</h3>
+                        <div class="analytics-breakdown" id="analyticsByProp"></div>
+                    </div>
+                    <div class="analytics-card">
+                        <h3><i class="fas fa-building"></i> By Sportsbook</h3>
+                        <div class="analytics-breakdown" id="analyticsByBook"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
+
+    <!-- Parlay Panel (Slide-out) -->
+    <div class="parlay-panel" id="parlayPanel">
+        <div class="parlay-panel-header">
+            <h2><i class="fas fa-layer-group"></i> Parlay Builder</h2>
+            <button class="btn btn-icon close-parlay" id="closeParlayBtn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="parlay-panel-content" id="parlaySlip">
+            <div class="parlay-empty">
+                <i class="fas fa-layer-group"></i>
+                <p>Add props to build your parlay</p>
+                <span>Click "Add to Parlay" on any prop card</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parlay Overlay -->
+    <div class="parlay-overlay" id="parlayOverlay"></div>
+
+    <!-- Add Bet Modal -->
+    <div class="modal" id="addBetModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-plus-circle"></i> Add New Bet</h2>
+                <button class="btn btn-icon close-modal" data-modal="addBetModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addBetForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Sport</label>
+                            <select id="betSport" required>
+                                <option value="">Select sport</option>
+                                <option value="nba">NBA</option>
+                                <option value="nfl">NFL</option>
+                                <option value="mlb">MLB</option>
+                                <option value="nhl">NHL</option>
+                                <option value="ncaab">NCAAB</option>
+                                <option value="ncaaf">NCAAF</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Sportsbook</label>
+                            <select id="betSportsbook">
+                                <option value="draftkings">DraftKings</option>
+                                <option value="fanduel">FanDuel</option>
+                                <option value="betmgm">BetMGM</option>
+                                <option value="caesars">Caesars</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Player Name</label>
+                            <input type="text" id="betPlayer" placeholder="e.g., LeBron James" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Team</label>
+                            <input type="text" id="betTeam" placeholder="e.g., LAL">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Prop Type</label>
+                            <select id="betPropType">
+                                <option value="Points">Points</option>
+                                <option value="Rebounds">Rebounds</option>
+                                <option value="Assists">Assists</option>
+                                <option value="3-Pointers">3-Pointers</option>
+                                <option value="Pass Yards">Pass Yards</option>
+                                <option value="Rush Yards">Rush Yards</option>
+                                <option value="Rec Yards">Rec Yards</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Line</label>
+                            <input type="number" id="betLine" step="0.5" placeholder="25.5" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Pick</label>
+                            <select id="betPick" required>
+                                <option value="over">Over</option>
+                                <option value="under">Under</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Odds</label>
+                            <input type="number" id="betOdds" placeholder="-110" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Wager ($)</label>
+                            <input type="number" id="betWager" step="1" min="1" placeholder="10" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Potential Win</label>
+                            <div class="potential-win" id="potentialWinDisplay">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes (optional)</label>
+                        <textarea id="betNotes" placeholder="Any notes about this bet..."></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline close-modal" data-modal="addBetModal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-check"></i> Add Bet
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <!-- Footer -->
     <footer class="footer">
         <div class="footer-content">
             <div class="footer-section">
                 <h4>BetGenius AI</h4>
-                <p>AI-powered sports betting assistant with real-time data.</p>
+                <p>AI-powered player props assistant with real-time data.</p>
             </div>
             <div class="footer-section">
-                <h4>Supported Apps</h4>
+                <h4>Data Sources</h4>
                 <div class="supported-apps">
-                    <span class="app-badge prizepicks">PrizePicks</span>
                     <span class="app-badge draftkings">DraftKings</span>
                     <span class="app-badge fanduel">FanDuel</span>
-                    <span class="app-badge sleeper">Sleeper</span>
-                    <span class="app-badge underdog">Underdog</span>
-                    <span class="app-badge betr">Betr</span>
+                    <span class="app-badge espn">ESPN</span>
                 </div>
             </div>
             <div class="footer-section">
@@ -332,14 +506,594 @@
             </div>
         </div>
         <div class="footer-bottom">
-            <p>&copy; 2024 BetGenius AI. Data from ESPN & The Odds API.</p>
+            <p>&copy; 2024 BetGenius AI. Player stats from ESPN.</p>
         </div>
     </footer>
 
-    <script src="js/api.js"></script>
-    <script src="js/liveData.js"></script>
-    <script src="js/roster.js"></script>
-    <script src="js/analytics.js"></script>
-    <script src="js/app.js"></script>
+    <!-- Load only essential scripts for now -->
+    <script src="js/demoData.js?v=3"></script>
+    <script src="js/liveOdds.js?v=3"></script>
+    <script>
+        // Minimal app initialization that WORKS
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 BetGenius AI Starting...');
+
+            // Hide loading overlay immediately
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.classList.add('hidden');
+                overlay.style.display = 'none';
+            }
+
+            // Render props
+            renderAllProps();
+
+            // Setup navigation
+            setupNavigation();
+
+            // Setup sports filter
+            setupSportsFilter();
+
+            // Setup parlay builder
+            setupParlayBuilder();
+        });
+
+        let currentSport = 'all';
+        window.allPropsCache = []; // Global cache for parlay selection
+
+        async function renderAllProps() {
+            const container = document.getElementById('playerProps');
+            if (!container) return;
+
+            // Clear the props cache
+            window.allPropsCache = [];
+
+            container.innerHTML = '<div class="loading-placeholder"><i class="fas fa-spinner fa-spin"></i> Loading today\'s games and props...</div>';
+
+            let allProps = [];
+            let scheduleInfo = null;
+
+            // Try live ESPN odds first - filters to TODAY's games only
+            if (window.EnhancedPropsService) {
+                try {
+                    const props = await window.EnhancedPropsService.getProps(currentSport);
+                    scheduleInfo = await window.EnhancedPropsService.getTodaysSchedule();
+                    if (props && props.length > 0) {
+                        allProps = props;
+                        updateDataSource('Live - Today\'s Games Only', '#00ff88');
+                    }
+                } catch (e) {
+                    console.warn('Live fetch failed:', e);
+                }
+            }
+
+            // Fallback to demo data (unfiltered)
+            if (allProps.length === 0 && window.getDemoProps) {
+                allProps = window.getDemoProps(currentSport);
+                updateDataSource('Demo Mode (All Teams)', '#fbbf24');
+            }
+
+            // Organize by tier
+            const tiers = { topPicks: [], goodValue: [], leans: [], risky: [] };
+            allProps.forEach(prop => {
+                const conf = prop.confidence || 50;
+                if (conf >= 75) tiers.topPicks.push(prop);
+                else if (conf >= 65) tiers.goodValue.push(prop);
+                else if (conf >= 55) tiers.leans.push(prop);
+                else tiers.risky.push(prop);
+            });
+
+            // Sort each tier
+            Object.keys(tiers).forEach(t => tiers[t].sort((a,b) => (b.confidence||50) - (a.confidence||50)));
+
+            // Render
+            let html = '';
+
+            // Always show today's games summary (or fetch it)
+            const scheduleGamesGrid = document.getElementById('scheduleGamesGrid');
+            const scheduleSpinner = document.getElementById('scheduleLoadingSpinner');
+
+            if (scheduleGamesGrid) {
+                if (scheduleInfo && Object.keys(scheduleInfo).length > 0) {
+                    scheduleGamesGrid.innerHTML = renderGamesGrid(scheduleInfo, currentSport);
+                    if (scheduleSpinner) scheduleSpinner.style.display = 'none';
+                } else {
+                    // Try to get schedule directly if not available
+                    try {
+                        if (window.EnhancedPropsService) {
+                            const sched = await window.EnhancedPropsService.getTodaysSchedule();
+                            if (sched && Object.keys(sched).length > 0) {
+                                scheduleGamesGrid.innerHTML = renderGamesGrid(sched, currentSport);
+                                if (scheduleSpinner) scheduleSpinner.style.display = 'none';
+                            } else {
+                                scheduleGamesGrid.innerHTML = '<div style="color: #888; padding: 0.5rem;">No games found for today</div>';
+                                if (scheduleSpinner) scheduleSpinner.style.display = 'none';
+                            }
+                        }
+                    } catch(e) {
+                        console.warn('Could not fetch schedule:', e);
+                        scheduleGamesGrid.innerHTML = '<div style="color: #ff4444; padding: 0.5rem;">Failed to load schedule</div>';
+                        if (scheduleSpinner) scheduleSpinner.style.display = 'none';
+                    }
+                }
+            }
+
+            if (tiers.topPicks.length > 0) {
+                html += renderTierSection('Top Picks (75%+)', 'fire', 'top-picks', tiers.topPicks);
+            }
+            if (tiers.goodValue.length > 0) {
+                html += renderTierSection('Good Value (65-74%)', 'check-circle', 'good-value', tiers.goodValue);
+            }
+            if (tiers.leans.length > 0) {
+                html += renderTierSection('Leans (55-64%)', 'chart-line', 'leans', tiers.leans);
+            }
+            if (tiers.risky.length > 0) {
+                html += renderTierSection('Risky (<55%)', 'exclamation-triangle', 'risky', tiers.risky);
+            }
+
+            if (allProps.length === 0) {
+                html += '<div class="empty-state"><i class="fas fa-calendar-times"></i><p>No games scheduled for today in this sport</p><span>Try selecting a different sport or check back tomorrow!</span></div>';
+            }
+
+            container.innerHTML = html;
+
+            // Update counts
+            updateTierCounts(tiers);
+        }
+
+        // Renders just the games grid content (no wrapper - used with static container)
+        function renderGamesGrid(scheduleInfo, sport) {
+            let html = '';
+            const sportsToShow = sport === 'all' ? Object.keys(scheduleInfo) : [sport];
+            let totalGames = 0;
+
+            console.log('📅 Rendering games grid, schedule info:', scheduleInfo);
+
+            sportsToShow.forEach(s => {
+                const info = scheduleInfo[s];
+                if (!info || info.gameCount === 0) return;
+
+                totalGames += info.gameCount;
+
+                info.games.forEach(game => {
+                    const gameTime = new Date(game.time);
+                    const timeStr = gameTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    const statusClass = game.status === 'in_progress' || game.status === 'STATUS_IN_PROGRESS' ? 'live' :
+                                       game.status === 'final' || game.status === 'STATUS_FINAL' ? 'final' : 'scheduled';
+
+                    html += `
+                        <div class="game-card ${statusClass}" style="background: linear-gradient(135deg, #16213e 0%, #0f3460 100%); border: 1px solid #00ff88; border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                            <span class="game-sport" style="color: #888; font-size: 0.7rem; text-transform: uppercase;">${s.toUpperCase()}</span>
+                            <span class="game-matchup" style="color: #fff; font-weight: 600; font-size: 0.85rem;">${game.matchup}</span>
+                            <span class="game-time" style="color: ${statusClass === 'live' ? '#ff4444' : statusClass === 'final' ? '#888' : '#00ff88'}; font-size: 0.8rem;">${statusClass === 'live' ? '🔴 LIVE' : statusClass === 'final' ? '✓ Final' : '🕐 ' + timeStr}</span>
+                        </div>`;
+                });
+            });
+
+            if (totalGames === 0) {
+                html = '<div style="color: #888; padding: 0.5rem; text-align: center;"><i class="fas fa-moon"></i> No games scheduled yet for today</div>';
+            }
+
+            console.log('📅 Total games rendered:', totalGames);
+            return html;
+        }
+
+        function renderTodaysGames(scheduleInfo, sport) {
+            let html = '<div class="todays-games-section" style="background: #1a1a2e; border: 2px solid #00ff88; padding: 1rem; margin-bottom: 1.5rem; border-radius: 12px;">';
+            html += '<h3 class="games-header" style="color: #00ff88; font-size: 1.2rem; margin-bottom: 1rem;"><i class="fas fa-calendar-day"></i> Today\'s Schedule</h3>';
+            html += '<div class="games-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem;">';
+
+            const sportsToShow = sport === 'all' ? Object.keys(scheduleInfo) : [sport];
+            let totalGames = 0;
+
+            console.log('📅 Schedule Info:', scheduleInfo);
+            console.log('📅 Sports to show:', sportsToShow);
+
+            sportsToShow.forEach(s => {
+                const info = scheduleInfo[s];
+                console.log(`📅 ${s}:`, info);
+                if (!info || info.gameCount === 0) return;
+
+                totalGames += info.gameCount;
+
+                info.games.forEach(game => {
+                    const gameTime = new Date(game.time);
+                    const timeStr = gameTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    const statusClass = game.status === 'in_progress' ? 'live' : game.status === 'final' ? 'final' : 'scheduled';
+
+                    html += `
+                        <div class="game-card ${statusClass}">
+                            <span class="game-sport">${s.toUpperCase()}</span>
+                            <span class="game-matchup">${game.matchup}</span>
+                            <span class="game-time">${statusClass === 'live' ? '🔴 LIVE' : statusClass === 'final' ? 'Final' : timeStr}</span>
+                        </div>`;
+                });
+            });
+
+            html += '</div>';
+
+            if (totalGames === 0) {
+                html = '<div class="todays-games-section"><div class="no-games"><i class="fas fa-moon"></i> No games scheduled yet today</div></div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function renderTierSection(title, icon, tierClass, props) {
+            let html = `<div class="tier-section ${tierClass}">
+                <h2 class="tier-header"><i class="fas fa-${icon}"></i> ${title}</h2>
+                <div class="props-grid">`;
+            props.forEach(p => { html += renderPropCard(p); });
+            html += '</div></div>';
+            return html;
+        }
+
+        function renderPropCard(prop) {
+            // Store prop in global cache
+            const propIndex = window.allPropsCache.length;
+            window.allPropsCache.push(prop);
+
+            const conf = prop.confidence || 50;
+            const confClass = conf >= 75 ? 'high' : conf >= 65 ? 'medium' : conf >= 55 ? 'low' : 'risky';
+            const pickClass = (prop.pick || '').toLowerCase().includes('over') ? 'over' : 'under';
+            const odds = prop.odds?.over || prop.odds?.under || prop.odds?.win || -110;
+
+            // Get injury badge if player is injured
+            const injuryBadge = window.getInjuryBadge ? window.getInjuryBadge(prop.injury) : '';
+            const hasInjury = prop.injury && prop.injury.status !== 'CLEARED';
+
+            return `
+                <div class="prop-card ${confClass}${hasInjury ? ' has-injury' : ''}">
+                    <div class="prop-header">
+                        <div class="player-info">
+                            <span class="player-name">${prop.player || 'Unknown'} ${injuryBadge}</span>
+                            <span class="player-team">${prop.team || ''} • ${(prop.sport || '').toUpperCase()}</span>
+                            ${hasInjury ? `<span class="injury-note">${prop.injury.type}: ${prop.injury.note}</span>` : ''}
+                        </div>
+                        <div class="confidence-badge ${confClass}">
+                            <span class="confidence-value">${Math.round(conf)}%</span>
+                        </div>
+                    </div>
+                    <div class="prop-body">
+                        <div class="prop-type">${prop.propType || 'Prop'}</div>
+                        <div class="prop-line"><span class="line-value">${prop.line || 0}</span></div>
+                        <div class="prop-pick ${pickClass}">
+                            <span class="pick-label">${prop.pick || 'PICK'}</span>
+                            <span class="pick-odds">${odds > 0 ? '+' : ''}${odds}</span>
+                        </div>
+                    </div>
+                    ${prop.reasoning ? `<div class="prop-reasoning"><p>${prop.reasoning}</p></div>` : ''}
+                ${prop.gameInfo ? `<div class="prop-game-info"><i class="fas fa-gamepad"></i> ${prop.gameInfo}</div>` : ''}
+                <div class="prop-actions">
+                    <button class="btn btn-parlay" onclick="addToParlayByIndex(${propIndex})">
+                        <i class="fas fa-layer-group"></i> Add to Parlay
+                    </button>
+                </div>
+                </div>`;
+        }
+
+        function updateDataSource(text, color) {
+            const el = document.getElementById('dataSourceText');
+            if (el) {
+                el.innerHTML = `<i class="fas fa-signal" style="color: ${color};"></i> ${text}`;
+                el.style.color = color;
+            }
+        }
+
+        function updateTierCounts(tiers) {
+            const total = Object.values(tiers).reduce((sum, arr) => sum + arr.length, 0);
+            document.getElementById('tierCountAll')?.textContent && (document.getElementById('tierCountAll').textContent = total);
+            document.getElementById('tierCountTop')?.textContent && (document.getElementById('tierCountTop').textContent = tiers.topPicks?.length || 0);
+            document.getElementById('tierCountGood')?.textContent && (document.getElementById('tierCountGood').textContent = tiers.goodValue?.length || 0);
+            document.getElementById('tierCountLean')?.textContent && (document.getElementById('tierCountLean').textContent = tiers.leans?.length || 0);
+            document.getElementById('tierCountRisky')?.textContent && (document.getElementById('tierCountRisky').textContent = tiers.risky?.length || 0);
+        }
+
+        function setupNavigation() {
+            document.querySelectorAll('.nav-links a').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const page = this.dataset.page;
+                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                    document.getElementById(page)?.classList.add('active');
+                    document.querySelectorAll('.nav-links a').forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+        }
+
+        function setupSportsFilter() {
+            document.querySelectorAll('.sport-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    currentSport = this.dataset.sport;
+                    document.querySelectorAll('.sport-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    renderAllProps();
+                });
+            });
+        }
+
+        // Parlay Builder functionality
+        let parlayLegs = [];
+
+        function setupParlayBuilder() {
+            const parlayToggle = document.getElementById('parlayToggleBtn');
+            const parlayPanel = document.getElementById('parlayPanel');
+            const parlayOverlay = document.getElementById('parlayOverlay');
+            const closeParlay = document.getElementById('closeParlayBtn');
+
+            if (parlayToggle) {
+                parlayToggle.addEventListener('click', () => {
+                    parlayPanel?.classList.toggle('open');
+                    parlayOverlay?.classList.toggle('active');
+                });
+            }
+
+            if (closeParlay) {
+                closeParlay.addEventListener('click', () => {
+                    parlayPanel?.classList.remove('open');
+                    parlayOverlay?.classList.remove('active');
+                });
+            }
+
+            if (parlayOverlay) {
+                parlayOverlay.addEventListener('click', () => {
+                    parlayPanel?.classList.remove('open');
+                    parlayOverlay?.classList.remove('active');
+                });
+            }
+
+            renderParlaySlip();
+        }
+
+        function addToParlay(prop) {
+            // Check if already in parlay
+            const exists = parlayLegs.find(l => l.player === prop.player && l.propType === prop.propType);
+            if (exists) {
+                alert('This prop is already in your parlay!');
+                return;
+            }
+
+            if (parlayLegs.length >= 10) {
+                alert('Maximum 10 legs allowed in a parlay');
+                return;
+            }
+
+            parlayLegs.push(prop);
+            renderParlaySlip();
+
+            // Open parlay panel
+            document.getElementById('parlayPanel')?.classList.add('open');
+            document.getElementById('parlayOverlay')?.classList.add('active');
+        }
+
+        function removeFromParlay(index) {
+            parlayLegs.splice(index, 1);
+            renderParlaySlip();
+        }
+
+        function clearParlay() {
+            parlayLegs = [];
+            renderParlaySlip();
+        }
+
+        function renderParlaySlip() {
+            const slip = document.getElementById('parlaySlip');
+            if (!slip) return;
+
+            if (parlayLegs.length === 0) {
+                slip.innerHTML = `
+                    <div class="parlay-empty">
+                        <i class="fas fa-layer-group"></i>
+                        <p>Add props to build your parlay</p>
+                        <span>Click "Add to Parlay" on any prop card</span>
+                    </div>`;
+                return;
+            }
+
+            const totalOdds = calculateParlayOdds();
+            const impliedProb = (1 / totalOdds * 100).toFixed(1);
+
+            // Check for injured players in parlay
+            const injuredLegs = parlayLegs.filter(leg => leg.injury && leg.injury.status !== 'CLEARED');
+            const hasInjuredPlayers = injuredLegs.length > 0;
+
+            let html = '';
+
+            // Injury warning banner
+            if (hasInjuredPlayers) {
+                html += `
+                    <div class="parlay-injury-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>${injuredLegs.length} player(s) with injury status - check before placing bet</span>
+                    </div>`;
+            }
+
+            html += '<div class="parlay-legs">';
+            parlayLegs.forEach((leg, idx) => {
+                const odds = leg.odds?.over || leg.odds?.under || -110;
+                const injuryBadge = window.getInjuryBadge ? window.getInjuryBadge(leg.injury) : '';
+                const hasInjury = leg.injury && leg.injury.status !== 'CLEARED';
+                const isOut = leg.injury && leg.injury.status === 'OUT';
+
+                html += `
+                    <div class="parlay-leg${hasInjury ? ' leg-injured' : ''}${isOut ? ' leg-out' : ''}">
+                        <div class="leg-info">
+                            <span class="leg-player">${leg.player} ${injuryBadge}</span>
+                            <span class="leg-prop">${leg.propType} ${leg.pick} ${leg.line}</span>
+                            ${hasInjury ? `<span class="leg-injury-note">${leg.injury.type}: ${leg.injury.note}</span>` : ''}
+                        </div>
+                        <div class="leg-odds">${odds > 0 ? '+' : ''}${odds}</div>
+                        <button class="btn btn-icon remove-leg" onclick="removeFromParlay(${idx})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>`;
+            });
+            html += '</div>';
+
+            html += `
+                <div class="parlay-summary">
+                    <div class="parlay-stat">
+                        <span class="stat-label">Legs</span>
+                        <span class="stat-value">${parlayLegs.length}</span>
+                    </div>
+                    <div class="parlay-stat">
+                        <span class="stat-label">Total Odds</span>
+                        <span class="stat-value">${totalOdds >= 2 ? '+' + Math.round((totalOdds - 1) * 100) : Math.round(-100 / (totalOdds - 1))}</span>
+                    </div>
+                    <div class="parlay-stat">
+                        <span class="stat-label">$10 Wins</span>
+                        <span class="stat-value">$${(10 * totalOdds).toFixed(2)}</span>
+                    </div>
+                </div>
+                <div class="parlay-actions">
+                    <button class="btn btn-outline" onclick="clearParlay()">
+                        <i class="fas fa-trash"></i> Clear
+                    </button>
+                    <button class="btn btn-primary" onclick="alert('Parlay saved! Total odds: ' + (totalOdds >= 2 ? '+' + Math.round((totalOdds - 1) * 100) : Math.round(-100 / (totalOdds - 1))))">
+                        <i class="fas fa-check"></i> Save Parlay
+                    </button>
+                </div>`;
+
+            slip.innerHTML = html;
+        }
+
+        function calculateParlayOdds() {
+            let totalDecimal = 1;
+            parlayLegs.forEach(leg => {
+                const american = leg.odds?.over || leg.odds?.under || -110;
+                const decimal = american > 0 ? (american / 100) + 1 : (100 / Math.abs(american)) + 1;
+                totalDecimal *= decimal;
+            });
+            return totalDecimal;
+        }
+
+        // Make functions global for onclick handlers
+        window.addToParlay = addToParlay;
+        window.removeFromParlay = removeFromParlay;
+        window.clearParlay = clearParlay;
+
+        // Add by index function
+        window.addToParlayByIndex = function(index) {
+            const prop = window.allPropsCache[index];
+            if (prop) {
+                addToParlay(prop);
+            }
+        };
+
+        // =====================================================
+        // Notification Button Setup
+        // =====================================================
+        function setupNotificationButton() {
+            const btn = document.getElementById('notificationToggleBtn');
+            if (!btn) return;
+
+            // Update button state based on current notification status
+            function updateButtonState() {
+                if (!window.NotificationManager) return;
+
+                const nm = window.NotificationManager;
+                const icon = btn.querySelector('i');
+
+                if (nm.canNotify()) {
+                    btn.classList.add('notifications-enabled');
+                    btn.title = 'Notifications Enabled (75%+ picks)';
+                    icon.className = 'fas fa-bell';
+                } else if (nm.permission === 'denied') {
+                    btn.classList.add('notifications-blocked');
+                    btn.title = 'Notifications Blocked';
+                    icon.className = 'fas fa-bell-slash';
+                } else {
+                    btn.classList.remove('notifications-enabled', 'notifications-blocked');
+                    btn.title = 'Enable Notifications';
+                    icon.className = 'far fa-bell';
+                }
+            }
+
+            btn.addEventListener('click', async () => {
+                if (!window.NotificationManager) {
+                    alert('Notifications not loaded yet. Please refresh.');
+                    return;
+                }
+
+                const nm = window.NotificationManager;
+
+                if (nm.permission === 'denied') {
+                    alert('Notifications are blocked. Please enable them in your browser settings.');
+                    return;
+                }
+
+                if (nm.canNotify()) {
+                    // Already enabled - offer to test or disable
+                    const action = confirm('Notifications are enabled!\n\nClick OK to send a test notification.\nClick Cancel to disable notifications.');
+                    if (action) {
+                        await nm.sendTestNotification();
+                    } else {
+                        nm.disable();
+                        updateButtonState();
+                    }
+                } else {
+                    // Request permission
+                    await nm.requestPermission();
+                    updateButtonState();
+                }
+            });
+
+            // Initial state
+            setTimeout(updateButtonState, 500);
+        }
+
+        // Call setup after notifications.js loads
+        setTimeout(setupNotificationButton, 100);
+    </script>
+
+    <!-- Notifications Script -->
+    <script src="js/notifications.js?v=1"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then((registration) => {
+                        console.log('✅ Service Worker registered:', registration.scope);
+
+                        // Check for updates
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // New version available
+                                    if (window.ToastManager) {
+                                        window.ToastManager.show('New version available! Refresh to update.', 'info', 10000);
+                                    }
+                                }
+                            });
+                        });
+                    })
+                    .catch((error) => {
+                        console.warn('⚠️ Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        // Handle install prompt for PWA
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+
+            // Show install button or prompt
+            console.log('📱 App can be installed');
+        });
+
+        // Track successful installation
+        window.addEventListener('appinstalled', () => {
+            console.log('✅ BetGenius AI installed as PWA');
+            deferredPrompt = null;
+        });
+    </script>
 </body>
 </html>

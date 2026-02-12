@@ -711,13 +711,39 @@ class LiveDataService {
         return this.lastUpdate;
     }
 
-    // Force refresh all data
+// Force refresh all data
     async refresh() {
+        console.log('🔄 Force refreshing all live data...');
+        const startTime = Date.now();
+
+        // Clear all caches first
         this.cache.clear();
         this.liveOdds.clear();
         this.playerProps.clear();
         this.playerStats.clear();
+
+        // Re-check proxy availability
+        await this.checkProxyServer();
+
+        // Reinitialize all data
         await this.initialize();
+
+        const elapsed = Date.now() - startTime;
+        console.log(`✅ Full refresh completed in ${elapsed}ms`);
+
+        // Emit event for UI updates
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('liveDataRefreshed', {
+                detail: {
+                    timestamp: this.lastUpdate,
+                    sources: this.dataSources,
+                    statsCount: this.playerStats.size,
+                    oddsCount: this.liveOdds.size,
+                    propsCount: this.playerProps.size
+                }
+            }));
+        }
+
         return this.lastUpdate;
     }
 

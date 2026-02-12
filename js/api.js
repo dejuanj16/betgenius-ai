@@ -322,18 +322,16 @@ class SportsAPIService {
         } catch (error) {
             console.error('Error fetching aggregated data:', error);
 
-            // Show error toast
-            if (window.ToastManager) {
+            // Show error toast only ONCE (not for every sport)
+            if (window.ToastManager && !this._connectionErrorShown) {
                 if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    this._connectionErrorShown = true;
                     window.ToastManager.error(
                         'Connection Error',
-                        'Cannot connect to data server. Make sure the proxy server is running on port 3001.'
+                        'Cannot connect to data server. Using demo mode.'
                     );
-                } else {
-                    window.ToastManager.error(
-                        'Data Error',
-                        `Failed to load ${sport.toUpperCase()} data: ${error.message}`
-                    );
+                    // Reset after 60 seconds so it can show again if needed
+                    setTimeout(() => { this._connectionErrorShown = false; }, 60000);
                 }
             }
 
