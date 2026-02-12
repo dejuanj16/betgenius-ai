@@ -2715,6 +2715,67 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // =====================================================
+        // ROSTER API ENDPOINTS
+        // =====================================================
+
+        // POST /api/rosters/sync - Force roster sync from ESPN
+        if (path === '/api/rosters/sync' && req.method === 'POST') {
+            console.log('📋 Manual roster sync triggered via API');
+            const result = await syncAllRostersFromESPN();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(result));
+            return;
+        }
+
+        // GET /api/rosters/status - Get roster sync status
+        if (path === '/api/rosters/status') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                lastUpdated: LIVE_ROSTER_CACHE.lastUpdated,
+                lastSyncStatus: LIVE_ROSTER_CACHE.lastSyncStatus,
+                counts: {
+                    nba: LIVE_ROSTER_CACHE.nba.size,
+                    nfl: LIVE_ROSTER_CACHE.nfl.size,
+                    nhl: LIVE_ROSTER_CACHE.nhl.size,
+                    mlb: LIVE_ROSTER_CACHE.mlb.size
+                },
+                nextSyncIn: LIVE_ROSTER_CACHE.lastUpdated 
+                    ? Math.max(0, Math.round((new Date(LIVE_ROSTER_CACHE.lastUpdated).getTime() + ROSTER_REFRESH_INTERVAL_MS - Date.now()) / 60000)) + ' minutes'
+                    : 'pending'
+            }));
+            return;
+        }
+
+        // GET /api/rosters/:sport - Get all players for a sport
+        if (path.match(/^\/api\/rosters\/(nba|nfl|nhl|mlb)$/)) {
+            const sport = path.split('/')[3];
+            const sportCache = LIVE_ROSTER_CACHE[sport];
+            const players = sportCache ? Array.from(sportCache.values()) : [];
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                sport,
+                playerCount: players.length,
+                lastUpdated: LIVE_ROSTER_CACHE.lastUpdated,
+                players
+            }));
+            return;
+        }
+
+        // GET /api/rosters/player/:name - Get specific player info
+        if (path.startsWith('/api/rosters/player/')) {
+            const playerName = decodeURIComponent(path.split('/api/rosters/player/')[1]);
+            const player = getPlayerFromLiveRoster(playerName, 'nba');
+            if (player) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(player));
+            } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Player not found', searched: playerName }));
+            }
+            return;
+        }
+
         // Cache invalidation - clear all or specific sport
         if (path.startsWith('/api/cache/clear')) {
             const sport = path.split('/')[4]?.toLowerCase();
@@ -10292,6 +10353,9 @@ server.listen(PORT, async () => {
     // Initialize roster caches (for accurate team assignments)
     console.log('📋 Loading player rosters...');
     await initializeRosterCaches();
+
+    // Initialize automatic ESPN roster sync system
+    await initializeRosterSystem();
 
     // Fetch today's games for matchup info
     console.log('🎮 Loading today\'s games...');
