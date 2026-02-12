@@ -5854,38 +5854,41 @@ async function fetchNHLOfficialData() {
 
         try {
             const skaterData = await fetchJSON(skaterStatsUrl);
-            // Parse NHL API response properly
+            // Parse NHL API response - teamAbbrev is direct string, not nested object
             const goalsData = (skaterData.goals || []).map(p => ({
-                player: p.firstName?.default + ' ' + p.lastName?.default,
-                team: p.teamAbbrev?.default || p.teamAbbrev,
-                value: p.value,
-                gamesPlayed: p.gamesPlayed,
-                perGame: p.gamesPlayed > 0 ? p.value / p.gamesPlayed : 0,
+                player: (p.firstName?.default || '') + ' ' + (p.lastName?.default || ''),
+                team: p.teamAbbrev,  // Direct string, not .default
+                value: p.value || 0,
+                gamesPlayed: 60, // Approximate games played mid-season
+                perGame: (p.value || 0) / 60,
                 headshot: p.headshot,
+                position: p.position,
                 category: 'goals'
             }));
             const assistsData = (skaterData.assists || []).map(p => ({
-                player: p.firstName?.default + ' ' + p.lastName?.default,
-                team: p.teamAbbrev?.default || p.teamAbbrev,
-                value: p.value,
-                gamesPlayed: p.gamesPlayed,
-                perGame: p.gamesPlayed > 0 ? p.value / p.gamesPlayed : 0,
+                player: (p.firstName?.default || '') + ' ' + (p.lastName?.default || ''),
+                team: p.teamAbbrev,
+                value: p.value || 0,
+                gamesPlayed: 60,
+                perGame: (p.value || 0) / 60,
                 headshot: p.headshot,
+                position: p.position,
                 category: 'assists'
             }));
             const pointsData = (skaterData.points || []).map(p => ({
-                player: p.firstName?.default + ' ' + p.lastName?.default,
-                team: p.teamAbbrev?.default || p.teamAbbrev,
-                value: p.value,
-                gamesPlayed: p.gamesPlayed,
-                perGame: p.gamesPlayed > 0 ? p.value / p.gamesPlayed : 0,
+                player: (p.firstName?.default || '') + ' ' + (p.lastName?.default || ''),
+                team: p.teamAbbrev,
+                value: p.value || 0,
+                gamesPlayed: 60,
+                perGame: (p.value || 0) / 60,
                 headshot: p.headshot,
+                position: p.position,
                 category: 'points'
             }));
             skaterLeaders = goalsData.concat(assistsData, pointsData);
             console.log(`✅ NHL Skater stats: ${skaterLeaders.length} leaders loaded`);
         } catch (e) {
-            console.log('⚠️ NHL Skater stats unavailable, trying ESPN fallback...');
+            console.log('⚠️ NHL Skater stats unavailable:', e.message);
         }
 
         try {
