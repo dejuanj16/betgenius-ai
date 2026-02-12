@@ -203,19 +203,296 @@ async function clearAnalyticsData() {
 loadAnalyticsFromFile();
 
 // =====================================================
-// LIVE ROSTER CACHE SYSTEM
+// AUTOMATIC ESPN ROSTER SYNC SYSTEM
 // Fetches and caches current player team assignments daily
+// Replaces manual roster updates with live ESPN data
 // =====================================================
 
-const ROSTER_CACHE = {
-    nba: { players: new Map(), lastUpdated: null },
-    nfl: { players: new Map(), lastUpdated: null },
-    nhl: { players: new Map(), lastUpdated: null },
-    mlb: { players: new Map(), lastUpdated: null }
+const ROSTER_FILE = path.join(__dirname, 'data', 'rosters.json');
+const ROSTER_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000; // Refresh every 4 hours
+
+// Live roster cache (populated from ESPN API)
+const LIVE_ROSTER_CACHE = {
+    nba: new Map(),
+    nfl: new Map(),
+    nhl: new Map(),
+    mlb: new Map(),
+    lastUpdated: null,
+    lastSyncStatus: 'pending'
 };
 
-// Roster refresh interval (6 hours)
-const ROSTER_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000;
+// ESPN API team IDs for each sport
+const ESPN_TEAM_IDS = {
+    nba: [
+        { id: 1, abbr: 'ATL' }, { id: 2, abbr: 'BOS' }, { id: 17, abbr: 'BKN' },
+        { id: 30, abbr: 'CHA' }, { id: 4, abbr: 'CHI' }, { id: 5, abbr: 'CLE' },
+        { id: 6, abbr: 'DAL' }, { id: 7, abbr: 'DEN' }, { id: 8, abbr: 'DET' },
+        { id: 9, abbr: 'GS' }, { id: 10, abbr: 'HOU' }, { id: 11, abbr: 'IND' },
+        { id: 12, abbr: 'LAC' }, { id: 13, abbr: 'LAL' }, { id: 14, abbr: 'MEM' },
+        { id: 15, abbr: 'MIL' }, { id: 16, abbr: 'MIN' }, { id: 3, abbr: 'NO' },
+        { id: 18, abbr: 'NYK' }, { id: 22, abbr: 'OKC' }, { id: 19, abbr: 'ORL' },
+        { id: 20, abbr: 'PHI' }, { id: 21, abbr: 'PHX' }, { id: 23, abbr: 'POR' },
+        { id: 24, abbr: 'SAC' }, { id: 25, abbr: 'SAS' }, { id: 28, abbr: 'TOR' },
+        { id: 26, abbr: 'UTA' }, { id: 27, abbr: 'WAS' }
+    ],
+    nfl: [], // Add NFL teams as needed
+    nhl: [], // Add NHL teams as needed
+    mlb: []  // Add MLB teams as needed
+};
+
+// Fetch JSON helper with timeout
+async function fetchJSONWithTimeout(url, timeoutMs = 5000) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+    } catch (e) {
+        clearTimeout(timeout);
+        throw e;
+    }
+}
+
+// Fetch roster for a single team from ESPN
+async function fetchTeamRosterFromESPN(sport, teamId, teamAbbr) {
+    const sportPaths = {
+        nba: 'basketball/nba',
+        nfl: 'football/nfl',
+        nhl: 'hockey/nhl',
+        mlb: 'baseball/mlb'
+    };
+
+    const sportPath = sportPaths[sport];
+    if (!sportPath) return [];
+
+    try {
+        const url = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/teams/${teamId}/roster`;
+        const data = await fetchJSONWithTimeout(url, 8000);
+
+        const players = [];
+        const teamName = data.team?.displayName || teamAbbr;
+
+        for (const group of data.athletes || []) {
+            const items = group.items || [group];
+            for (const athlete of items) {
+                const name = athlete.displayName || athlete.fullName;
+                if (!name) continue;
+
+                const position = athlete.position?.abbreviation || '';
+                const status = athlete.status?.type?.toLowerCase() || 'active';
+                const isInjured = ['injured', 'out', 'doubtful', 'injured-reserve', 'day-to-day'].includes(status);
+
+                players.push({
+                    name,
+                    team: teamAbbr,
+                    fullTeam: teamName,
+                    position,
+                    sport,
+                    injured: isInjured,
+                    status: athlete.status?.type || 'Active',
+                    espnId: athlete.id
+                });
+            }
+        }
+
+        return players;
+    } catch (e) {
+        console.warn(`  ⚠️ Failed to fetch ${teamAbbr} roster: ${e.message}`);
+        return [];
+    }
+}
+
+// Sync all rosters for a sport from ESPN
+async function syncSportRostersFromESPN(sport) {
+    const teams = ESPN_TEAM_IDS[sport];
+    if (!teams || teams.length === 0) {
+        console.log(`⚠️ No team IDs configured for ${sport.toUpperCase()}`);
+        return 0;
+    }
+
+    console.log(`📋 Syncing ${sport.toUpperCase()} rosters from ESPN (${teams.length} teams)...`);
+
+    let totalPlayers = 0;
+    const sportCache = LIVE_ROSTER_CACHE[sport];
+    sportCache.clear();
+
+    // Fetch teams in batches to avoid rate limiting
+    const batchSize = 5;
+    for (let i = 0; i < teams.length; i += batchSize) {
+        const batch = teams.slice(i, i + batchSize);
+        const results = await Promise.all(
+            batch.map(t => fetchTeamRosterFromESPN(sport, t.id, t.abbr))
+        );
+
+        for (const players of results) {
+            for (const player of players) {
+                sportCache.set(player.name, player);
+                totalPlayers++;
+            }
+        }
+
+        // Small delay between batches
+        if (i + batchSize < teams.length) {
+            await new Promise(r => setTimeout(r, 200));
+        }
+    }
+
+    console.log(`  ✅ ${sport.toUpperCase()}: ${totalPlayers} players synced`);
+    return totalPlayers;
+}
+
+// Full roster sync for all sports
+async function syncAllRostersFromESPN() {
+    console.log('');
+    console.log('🔄 ========================================');
+    console.log('🔄 AUTOMATIC ESPN ROSTER SYNC STARTING');
+    console.log('🔄 ========================================');
+    const startTime = Date.now();
+
+    try {
+        // Sync NBA (primary focus)
+        const nbaCount = await syncSportRostersFromESPN('nba');
+
+        // Could add NFL/NHL/MLB here when needed
+        // const nflCount = await syncSportRostersFromESPN('nfl');
+
+        LIVE_ROSTER_CACHE.lastUpdated = new Date().toISOString();
+        LIVE_ROSTER_CACHE.lastSyncStatus = 'success';
+
+        // Save to file for persistence
+        await saveRostersToFile();
+
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log('🔄 ========================================');
+        console.log(`✅ ROSTER SYNC COMPLETE in ${elapsed}s`);
+        console.log(`   NBA: ${nbaCount} players`);
+        console.log(`   Last updated: ${LIVE_ROSTER_CACHE.lastUpdated}`);
+        console.log('🔄 ========================================');
+        console.log('');
+
+        return { success: true, nba: nbaCount, timestamp: LIVE_ROSTER_CACHE.lastUpdated };
+    } catch (e) {
+        console.error('❌ Roster sync failed:', e.message);
+        LIVE_ROSTER_CACHE.lastSyncStatus = 'error: ' + e.message;
+        return { success: false, error: e.message };
+    }
+}
+
+// Save rosters to file for persistence across restarts
+async function saveRostersToFile() {
+    try {
+        const data = {
+            lastUpdated: LIVE_ROSTER_CACHE.lastUpdated,
+            nba: Object.fromEntries(LIVE_ROSTER_CACHE.nba),
+            nfl: Object.fromEntries(LIVE_ROSTER_CACHE.nfl),
+            nhl: Object.fromEntries(LIVE_ROSTER_CACHE.nhl),
+            mlb: Object.fromEntries(LIVE_ROSTER_CACHE.mlb)
+        };
+        fs.writeFileSync(ROSTER_FILE, JSON.stringify(data, null, 2));
+        console.log('💾 Rosters saved to file');
+    } catch (e) {
+        console.warn('⚠️ Could not save rosters to file:', e.message);
+    }
+}
+
+// Load rosters from file on startup
+function loadRostersFromFile() {
+    try {
+        if (fs.existsSync(ROSTER_FILE)) {
+            const data = JSON.parse(fs.readFileSync(ROSTER_FILE, 'utf8'));
+            LIVE_ROSTER_CACHE.lastUpdated = data.lastUpdated;
+
+            if (data.nba) {
+                for (const [name, player] of Object.entries(data.nba)) {
+                    LIVE_ROSTER_CACHE.nba.set(name, player);
+                }
+            }
+            if (data.nfl) {
+                for (const [name, player] of Object.entries(data.nfl)) {
+                    LIVE_ROSTER_CACHE.nfl.set(name, player);
+                }
+            }
+
+            console.log(`📋 Loaded ${LIVE_ROSTER_CACHE.nba.size} NBA players from cache file`);
+            console.log(`   Last updated: ${LIVE_ROSTER_CACHE.lastUpdated}`);
+            return true;
+        }
+    } catch (e) {
+        console.warn('⚠️ Could not load rosters from file:', e.message);
+    }
+    return false;
+}
+
+// Get player info from live roster cache (with injury override support)
+function getPlayerFromLiveRoster(playerName, sport = 'nba') {
+    // First check injury overrides (these take priority)
+    if (INJURY_OVERRIDES[playerName]) {
+        return { ...INJURY_OVERRIDES[playerName], source: 'injury_override' };
+    }
+
+    // Then check live ESPN roster
+    const sportCache = LIVE_ROSTER_CACHE[sport];
+    if (sportCache && sportCache.has(playerName)) {
+        return { ...sportCache.get(playerName), source: 'espn_live' };
+    }
+
+    // Fall back to manual overrides (legacy)
+    if (RECENT_PLAYER_MOVES[playerName]) {
+        return { ...RECENT_PLAYER_MOVES[playerName], source: 'manual_override' };
+    }
+
+    return null;
+}
+
+// Check if roster cache needs refresh
+function shouldRefreshRosters() {
+    if (!LIVE_ROSTER_CACHE.lastUpdated) return true;
+
+    const lastUpdate = new Date(LIVE_ROSTER_CACHE.lastUpdated).getTime();
+    const now = Date.now();
+    const hoursSinceUpdate = (now - lastUpdate) / (1000 * 60 * 60);
+
+    return hoursSinceUpdate >= 4; // Refresh if more than 4 hours old
+}
+
+// Initialize roster system
+async function initializeRosterSystem() {
+    console.log('');
+    console.log('📋 Initializing ESPN Roster Sync System...');
+
+    // Load cached rosters from file
+    const loadedFromFile = loadRostersFromFile();
+
+    // If no cache or cache is old, sync immediately
+    if (!loadedFromFile || shouldRefreshRosters()) {
+        console.log('📋 Roster cache is stale, syncing from ESPN...');
+        await syncAllRostersFromESPN();
+    } else {
+        console.log('📋 Using cached rosters (still fresh)');
+    }
+
+    // Set up automatic refresh every 4 hours
+    setInterval(async () => {
+        console.log('⏰ Scheduled roster refresh triggered');
+        await syncAllRostersFromESPN();
+    }, ROSTER_REFRESH_INTERVAL_MS);
+
+    console.log(`📋 Roster auto-sync scheduled every ${ROSTER_REFRESH_INTERVAL_MS / (1000 * 60 * 60)} hours`);
+}
+
+// INJURY OVERRIDES - These always take priority over ESPN data
+// Use this for players ESPN hasn't updated yet or confirmed injuries
+const INJURY_OVERRIDES = {
+    'Anthony Davis': { team: 'WAS', fullTeam: 'Washington Wizards', position: 'PF', sport: 'nba', injured: true },
+    'Luka Doncic': { team: 'LAL', fullTeam: 'Los Angeles Lakers', position: 'PG', sport: 'nba', injured: true },
+    'Damian Lillard': { team: 'POR', fullTeam: 'Portland Trail Blazers', position: 'PG', sport: 'nba', injured: true },
+    'Trae Young': { team: 'WAS', fullTeam: 'Washington Wizards', position: 'PG', sport: 'nba', injured: true },
+    'Jayson Tatum': { team: 'BOS', fullTeam: 'Boston Celtics', position: 'SF', sport: 'nba', injured: true },
+    'Tyrese Haliburton': { team: 'IND', fullTeam: 'Indiana Pacers', position: 'PG', sport: 'nba', injured: true },
+    'Fred VanVleet': { team: 'HOU', fullTeam: 'Houston Rockets', position: 'PG', sport: 'nba', injured: true }
+};
 
 // Known recent trades/moves - manual overrides
 // VERIFIED by user - February 2026 Season
