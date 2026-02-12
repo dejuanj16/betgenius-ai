@@ -651,26 +651,15 @@ async function loadAllData() {
     }
 }
 
-// Fallback: Render demo data when live data fails
+// Removed - no longer using demo data fallback
 function renderDemoData() {
-    console.log('📊 Rendering demo data...');
-
-    if (!window.getDemoPropsByTier) {
-        console.warn('Demo data not available');
-        return;
-    }
-
-    const demoTiers = window.getDemoPropsByTier(currentSport);
-
-    // Update data source text
+    console.log('⚠️ Demo data disabled - using live ESPN data only');
+    // Show message that data is loading
     const dataSourceText = document.getElementById('dataSourceText');
     if (dataSourceText) {
-        dataSourceText.innerHTML = `<i class="fas fa-database" style="color: #fbbf24;"></i> Demo Mode - Sample props shown`;
-        dataSourceText.style.color = '#fbbf24';
+        dataSourceText.innerHTML = `<i class="fas fa-sync fa-spin"></i> Loading live data from ESPN...`;
+        dataSourceText.style.color = '#00ff88';
     }
-
-    // Render the tiered props
-    renderTieredProps(demoTiers);
 }
 
 // Calendar filter - only show games within 4 days from today
@@ -707,66 +696,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     };
 
-    // Render demo props directly function
+    // Render demo props directly function - DISABLED (using live data only)
     const showDemoProps = () => {
-        console.log('📊 Rendering demo props...');
-        if (!window.getDemoPropsByTier) {
-            console.warn('Demo data not available');
-            return;
-        }
-
-        const demoTiers = window.getDemoPropsByTier('all');
-        const container = document.getElementById('playerProps');
-        if (!container) return;
-
-        let html = '';
-
-        // Render Top Picks
-        if (demoTiers.topPicks && demoTiers.topPicks.length > 0) {
-            html += '<div class="tier-section top-picks"><h2 class="tier-header"><i class="fas fa-fire"></i> Top Picks (75%+)</h2><div class="props-grid">';
-            demoTiers.topPicks.forEach(prop => {
-                html += renderSimplePropCard(prop);
-            });
-            html += '</div></div>';
-        }
-
-        // Render Good Value
-        if (demoTiers.goodValue && demoTiers.goodValue.length > 0) {
-            html += '<div class="tier-section good-value"><h2 class="tier-header"><i class="fas fa-check-circle"></i> Good Value (65-74%)</h2><div class="props-grid">';
-            demoTiers.goodValue.forEach(prop => {
-                html += renderSimplePropCard(prop);
-            });
-            html += '</div></div>';
-        }
-
-        // Render Leans
-        if (demoTiers.leans && demoTiers.leans.length > 0) {
-            html += '<div class="tier-section leans"><h2 class="tier-header"><i class="fas fa-chart-line"></i> Leans (55-64%)</h2><div class="props-grid">';
-            demoTiers.leans.forEach(prop => {
-                html += renderSimplePropCard(prop);
-            });
-            html += '</div></div>';
-        }
-
-        // Render Risky
-        if (demoTiers.risky && demoTiers.risky.length > 0) {
-            html += '<div class="tier-section risky"><h2 class="tier-header"><i class="fas fa-exclamation-triangle"></i> Risky (<55%)</h2><div class="props-grid">';
-            demoTiers.risky.forEach(prop => {
-                html += renderSimplePropCard(prop);
-            });
-            html += '</div></div>';
-        }
-
-        container.innerHTML = html;
-
-        // Update tier counts
-        updateTierCounts(demoTiers);
-
-        // Update data source text
+        console.log('⚠️ Demo props disabled - using live ESPN data only');
         const dataSourceText = document.getElementById('dataSourceText');
         if (dataSourceText) {
-            dataSourceText.innerHTML = '<i class="fas fa-database" style="color: #fbbf24;"></i> Demo Mode - Sample props shown';
-            dataSourceText.style.color = '#fbbf24';
+            dataSourceText.innerHTML = '<i class="fas fa-sync fa-spin"></i> Loading live data...';
+            dataSourceText.style.color = '#00ff88';
         }
     };
 
@@ -805,13 +741,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         `;
     };
 
-    // FAILSAFE: Always hide loading and show demo data after 5 seconds
+    // FAILSAFE: Always hide loading after 5 seconds (no demo data fallback)
     setTimeout(() => {
         console.log('⏱️ Failsafe timer triggered');
         hideLoadingOverlay();
         const container = document.getElementById('playerProps');
         if (container && (!container.innerHTML || container.innerHTML.includes('Loading'))) {
-            showDemoProps();
+            container.innerHTML = '<div class="no-props-message" style="text-align: center; padding: 40px; color: #888;"><i class="fas fa-sync fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i><p>Loading live props from ESPN...</p><p style="font-size: 12px;">This may take a moment on free tier servers.</p></div>';
         }
     }, 5000);
 
@@ -2173,29 +2109,20 @@ async function loadPlayerProps() {
         }
     }
 
-    // === DEMO MODE FALLBACK ===
-    // If still no props and demo data is available, use demo data
+    // === DEMO MODE REMOVED ===
+    // Now using live ESPN data only - no demo fallback
     if (allPropsByTier.all.length === 0 &&
         allPropsByTier.topPicks.length === 0 &&
         allPropsByTier.goodValue.length === 0 &&
-        allPropsByTier.leans.length === 0 &&
-        window.getDemoPropsByTier) {
+        allPropsByTier.leans.length === 0) {
 
-        console.log('📊 Using demo data (server offline)');
-        const demoTiers = window.getDemoPropsByTier(currentSport);
+        console.log('⚠️ No props available - waiting for live data');
 
-        // Merge demo props into our tiers
-        ['topPicks', 'goodValue', 'leans', 'risky'].forEach(tier => {
-            if (demoTiers[tier]) {
-                allPropsByTier[tier] = allPropsByTier[tier].concat(demoTiers[tier]);
-            }
-        });
-
-        // Update data source text to show demo mode
+        // Update data source text to show loading
         const dataSourceText = document.getElementById('dataSourceText');
         if (dataSourceText) {
-            dataSourceText.innerHTML = `<i class="fas fa-database" style="color: #fbbf24;"></i> Demo Mode - Sample props shown (start server for live data)`;
-            dataSourceText.style.color = '#fbbf24';
+            dataSourceText.innerHTML = `<i class="fas fa-sync fa-spin"></i> Loading live props from ESPN...`;
+            dataSourceText.style.color = '#00ff88';
         }
     }
 

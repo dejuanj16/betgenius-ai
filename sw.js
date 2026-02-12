@@ -11,7 +11,7 @@ const STATIC_ASSETS = [
     '/',
     '/index.html',
     '/css/styles.css',
-    '/js/demoData.js',
+    // Demo data removed - using real ESPN API data only
     '/js/liveOdds.js',
     '/manifest.json'
 ];
