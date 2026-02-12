@@ -5843,8 +5843,10 @@ async function fetchNHLOfficialData() {
         }));
 
         // Get player stats leaders from NHL official API
-        const skaterStatsUrl = 'https://api-web.nhle.com/v1/skater-stats-leaders/current';
-        const goalieStatsUrl = 'https://api-web.nhle.com/v1/goalie-stats-leaders/current';
+        // Use season/gameType format (2 = regular season)
+        const currentSeason = '20242025';
+        const skaterStatsUrl = `https://api-web.nhle.com/v1/skater-stats-leaders/${currentSeason}/2`;
+        const goalieStatsUrl = `https://api-web.nhle.com/v1/goalie-stats-leaders/${currentSeason}/2`;
 
         let skaterLeaders = [];
         let goalieLeaders = [];

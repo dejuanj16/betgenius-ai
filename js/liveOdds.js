@@ -280,15 +280,15 @@ class EnhancedPropsService {
 
         // Fetch LIVE props from the API
         let allProps = [];
-        
+
         try {
             // Use relative URL for production, localhost for dev
             const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             const baseUrl = isLocalhost ? 'http://localhost:3001' : '';
-            
+
             const sportToFetch = sport === 'all' ? 'nba' : sport;
             const response = await fetch(`${baseUrl}/api/props/${sportToFetch}`);
-            
+
             if (response.ok) {
                 const data = await response.json();
                 // Handle both array format and object format with .props property
@@ -304,7 +304,7 @@ class EnhancedPropsService {
         }
 
         // Filter to only show players playing TODAY
-        const todaysProps = allProps.length > 0 
+        const todaysProps = allProps.length > 0
             ? this.liveOddsFetcher.filterPropsForToday(allProps, sport)
             : allProps;
 
