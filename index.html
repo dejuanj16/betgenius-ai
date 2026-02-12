@@ -78,6 +78,7 @@
                 <li><a href="#props" class="active" data-page="props"><i class="fas fa-user"></i> Player Props</a></li>
                 <li><a href="#live" data-page="live"><i class="fas fa-broadcast-tower"></i> Live Games</a></li>
                 <li><a href="#tracker" data-page="tracker"><i class="fas fa-chart-line"></i> Tracker</a></li>
+                <li><a href="#analytics" data-page="analytics"><i class="fas fa-chart-bar"></i> Analytics</a></li>
             </ul>
             <div class="nav-actions">
                 <button class="btn btn-icon notification-toggle" id="notificationToggleBtn" title="Enable Notifications">
@@ -359,6 +360,142 @@
                         <div class="analytics-breakdown" id="analyticsByBook"></div>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <!-- Analytics Dashboard Page -->
+        <section id="analytics" class="page">
+            <div class="page-header">
+                <h1><i class="fas fa-chart-bar"></i> Analytics Dashboard</h1>
+                <p>Monitor user engagement and feature usage</p>
+            </div>
+
+            <!-- Analytics Overview Cards -->
+            <div class="analytics-overview" id="analyticsOverview">
+                <div class="analytics-stat-card">
+                    <div class="stat-icon sessions"><i class="fas fa-users"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-number" id="totalSessions">0</span>
+                        <span class="stat-label">Total Sessions</span>
+                    </div>
+                </div>
+                <div class="analytics-stat-card">
+                    <div class="stat-icon events"><i class="fas fa-mouse-pointer"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-number" id="totalEvents">0</span>
+                        <span class="stat-label">Total Events</span>
+                    </div>
+                </div>
+                <div class="analytics-stat-card">
+                    <div class="stat-icon duration"><i class="fas fa-clock"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-number" id="sessionDuration">0s</span>
+                        <span class="stat-label">Current Session</span>
+                    </div>
+                </div>
+                <div class="analytics-stat-card">
+                    <div class="stat-icon first-visit"><i class="fas fa-calendar-alt"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-number" id="firstVisit">--</span>
+                        <span class="stat-label">First Visit</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature Usage Section -->
+            <div class="analytics-section">
+                <h2><i class="fas fa-fire"></i> Feature Usage</h2>
+                <div class="feature-usage-grid" id="featureUsageGrid">
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-eye"></i></div>
+                        <div class="feature-count" id="featurePropsViewed">0</div>
+                        <div class="feature-name">Props Viewed</div>
+                        <div class="feature-bar"><div class="bar-fill" id="barPropsViewed"></div></div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-layer-group"></i></div>
+                        <div class="feature-count" id="featureParlayAdds">0</div>
+                        <div class="feature-name">Parlay Adds</div>
+                        <div class="feature-bar"><div class="bar-fill" id="barParlayAdds"></div></div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-basketball-ball"></i></div>
+                        <div class="feature-count" id="featureGameClicks">0</div>
+                        <div class="feature-name">Game Clicks</div>
+                        <div class="feature-bar"><div class="bar-fill" id="barGameClicks"></div></div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-search"></i></div>
+                        <div class="feature-count" id="featureSearches">0</div>
+                        <div class="feature-name">Searches</div>
+                        <div class="feature-bar"><div class="bar-fill" id="barSearches"></div></div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-filter"></i></div>
+                        <div class="feature-count" id="featureSportFilters">0</div>
+                        <div class="feature-name">Sport Filters</div>
+                        <div class="feature-bar"><div class="bar-fill" id="barSportFilters"></div></div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-bell"></i></div>
+                        <div class="feature-count" id="featureNotifications">0</div>
+                        <div class="feature-name">Notifications</div>
+                        <div class="feature-bar"><div class="bar-fill" id="barNotifications"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Events Chart -->
+            <div class="analytics-section">
+                <h2><i class="fas fa-chart-pie"></i> Top Events</h2>
+                <div class="top-events-container">
+                    <div class="top-events-list" id="topEventsList">
+                        <!-- Populated by JS -->
+                    </div>
+                    <div class="top-events-chart" id="topEventsChart">
+                        <!-- Visual chart -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Activity Section -->
+            <div class="analytics-section">
+                <h2><i class="fas fa-calendar-week"></i> Daily Activity (Last 7 Days)</h2>
+                <div class="daily-activity-chart" id="dailyActivityChart">
+                    <!-- Bar chart populated by JS -->
+                </div>
+            </div>
+
+            <!-- Current Session Section -->
+            <div class="analytics-section">
+                <h2><i class="fas fa-history"></i> Current Session Events</h2>
+                <div class="session-events-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Event</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessionEventsBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="analytics-actions">
+                <button class="btn btn-primary" onclick="refreshAnalyticsDashboard()">
+                    <i class="fas fa-sync"></i> Refresh
+                </button>
+                <button class="btn btn-outline" onclick="exportAnalytics()">
+                    <i class="fas fa-download"></i> Export Data
+                </button>
+                <button class="btn btn-danger" onclick="confirmResetAnalytics()">
+                    <i class="fas fa-trash"></i> Reset Analytics
+                </button>
             </div>
         </section>
     </main>

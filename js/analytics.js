@@ -391,4 +391,217 @@ window.trackGameClick = (sport, matchup, teams) => window.BetGeniusAnalytics.tra
 window.showAnalytics = () => window.BetGeniusAnalytics.printDashboard();
 window.resetAnalytics = () => window.BetGeniusAnalytics.resetAnalytics();
 
+// =====================================================
+// Visual Dashboard Rendering
+// =====================================================
+
+function refreshAnalyticsDashboard() {
+    const analytics = window.BetGeniusAnalytics;
+    if (!analytics) return;
+
+    const dashboard = analytics.getAnalyticsDashboard();
+
+    // Update overview cards
+    const totalSessions = document.getElementById('totalSessions');
+    const totalEvents = document.getElementById('totalEvents');
+    const sessionDuration = document.getElementById('sessionDuration');
+    const firstVisit = document.getElementById('firstVisit');
+
+    if (totalSessions) totalSessions.textContent = dashboard.overview.totalSessions.toLocaleString();
+    if (totalEvents) totalEvents.textContent = dashboard.overview.totalEvents.toLocaleString();
+    if (sessionDuration) sessionDuration.textContent = dashboard.overview.currentSessionDuration;
+    if (firstVisit) firstVisit.textContent = dashboard.overview.firstVisit;
+
+    // Update feature usage
+    const features = dashboard.featureUsage;
+    const maxFeatureCount = Math.max(...Object.values(features), 1);
+
+    updateFeatureCard('featurePropsViewed', 'barPropsViewed', features.propsViewed, maxFeatureCount);
+    updateFeatureCard('featureParlayAdds', 'barParlayAdds', features.parlayAdds, maxFeatureCount);
+    updateFeatureCard('featureGameClicks', 'barGameClicks', features.gameClicks, maxFeatureCount);
+    updateFeatureCard('featureSearches', 'barSearches', features.searches, maxFeatureCount);
+    updateFeatureCard('featureSportFilters', 'barSportFilters', features.sportFilters, maxFeatureCount);
+    updateFeatureCard('featureNotifications', 'barNotifications', features.notificationsEnabled, maxFeatureCount);
+
+    // Render top events
+    renderTopEvents(dashboard.topFeatures);
+
+    // Render daily activity chart
+    renderDailyActivityChart(dashboard.dailyStats);
+
+    // Render session events
+    renderSessionEvents(analytics.events);
+
+    console.log('📊 Dashboard refreshed');
+}
+
+function updateFeatureCard(countId, barId, count, maxCount) {
+    const countEl = document.getElementById(countId);
+    const barEl = document.getElementById(barId);
+
+    if (countEl) countEl.textContent = count.toLocaleString();
+    if (barEl) barEl.style.width = `${(count / maxCount) * 100}%`;
+}
+
+function renderTopEvents(topFeatures) {
+    const listEl = document.getElementById('topEventsList');
+    const chartEl = document.getElementById('topEventsChart');
+
+    if (!topFeatures || topFeatures.length === 0) {
+        if (listEl) listEl.innerHTML = '<div class="empty-state">No events yet</div>';
+        if (chartEl) chartEl.innerHTML = '';
+        return;
+    }
+
+    const maxCount = Math.max(...topFeatures.map(f => f.count), 1);
+
+    // Render list
+    if (listEl) {
+        listEl.innerHTML = topFeatures.map((f, i) => `
+            <div class="top-event-item">
+                <span class="event-rank">#${i + 1}</span>
+                <span class="event-name">${formatEventName(f.feature)}</span>
+                <span class="event-count">${f.count}</span>
+            </div>
+        `).join('');
+    }
+
+    // Render chart
+    if (chartEl) {
+        chartEl.innerHTML = topFeatures.slice(0, 8).map(f => `
+            <div class="chart-bar-row">
+                <span class="chart-bar-label">${formatEventName(f.feature)}</span>
+                <div class="chart-bar-container">
+                    <div class="chart-bar" style="width: ${(f.count / maxCount) * 100}%">
+                        ${f.count}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+}
+
+function renderDailyActivityChart(dailyStats) {
+    const chartEl = document.getElementById('dailyActivityChart');
+    if (!chartEl) return;
+
+    // Get last 7 days
+    const dates = Object.keys(dailyStats).sort().slice(-7);
+
+    if (dates.length === 0) {
+        chartEl.innerHTML = '<div class="empty-state">No activity data yet</div>';
+        return;
+    }
+
+    const maxEvents = Math.max(...dates.map(d => dailyStats[d]?.events || 0), 1);
+
+    chartEl.innerHTML = dates.map(date => {
+        const stats = dailyStats[date] || { events: 0 };
+        const height = (stats.events / maxEvents) * 150;
+        const dayName = new Date(date).toLocaleDateString('en-US', { weekday: 'short' });
+        const dateStr = new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+        return `
+            <div class="daily-bar-container">
+                <div class="daily-bar" style="height: ${Math.max(height, 4)}px">
+                    <span class="daily-bar-count">${stats.events}</span>
+                </div>
+                <div class="daily-bar-label">${dayName}<br>${dateStr}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderSessionEvents(events) {
+    const tbody = document.getElementById('sessionEventsBody');
+    if (!tbody) return;
+
+    if (!events || events.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3">No events in this session yet</td></tr>';
+        return;
+    }
+
+    // Show last 20 events, newest first
+    const recentEvents = events.slice(-20).reverse();
+
+    tbody.innerHTML = recentEvents.map(e => {
+        const time = new Date(e.timestamp).toLocaleTimeString();
+        const details = formatEventDetails(e.properties);
+
+        return `
+            <tr>
+                <td>${time}</td>
+                <td><span class="event-badge">${formatEventName(e.event)}</span></td>
+                <td>${details}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function formatEventName(name) {
+    return name
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function formatEventDetails(props) {
+    if (!props) return '-';
+
+    const keys = ['player', 'sport', 'matchup', 'pageName', 'query', 'tier'];
+    const details = keys
+        .filter(k => props[k])
+        .map(k => `${k}: ${props[k]}`)
+        .slice(0, 3)
+        .join(', ');
+
+    return details || '-';
+}
+
+function exportAnalytics() {
+    const analytics = window.BetGeniusAnalytics;
+    if (!analytics) return;
+
+    const data = {
+        exported: new Date().toISOString(),
+        dashboard: analytics.getAnalyticsDashboard(),
+        events: analytics.events,
+        historicalData: analytics.historicalData
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `betgenius-analytics-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+
+    URL.revokeObjectURL(url);
+    console.log('📊 Analytics exported');
+}
+
+function confirmResetAnalytics() {
+    if (confirm('Are you sure you want to reset all analytics data? This cannot be undone.')) {
+        window.BetGeniusAnalytics.resetAnalytics();
+        refreshAnalyticsDashboard();
+        alert('Analytics data has been reset.');
+    }
+}
+
+// Export dashboard functions
+window.refreshAnalyticsDashboard = refreshAnalyticsDashboard;
+window.exportAnalytics = exportAnalytics;
+window.confirmResetAnalytics = confirmResetAnalytics;
+
+// Auto-refresh dashboard when analytics page is shown
+document.addEventListener('DOMContentLoaded', () => {
+    // Refresh when navigating to analytics page
+    const analyticsLink = document.querySelector('a[data-page="analytics"]');
+    if (analyticsLink) {
+        analyticsLink.addEventListener('click', () => {
+            setTimeout(refreshAnalyticsDashboard, 100);
+        });
+    }
+});
+
 console.log('📊 Analytics module loaded. Run showAnalytics() to view dashboard.');
