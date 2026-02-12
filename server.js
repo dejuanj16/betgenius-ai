@@ -4566,35 +4566,40 @@ async function fetchNHLPlayerStats() {
     try {
         console.log('🏒 Fetching REAL NHL stats from api-web.nhle.com...');
 
-        // Get skater stats leaders
-        const skaterUrl = 'https://api-web.nhle.com/v1/skater-stats-leaders/current?categories=points,goals,assists,plusMinus&limit=30';
+        // NHL API requires season/gameType format, NOT /current
+        // Season format: YYYYYYYY (e.g., 20242025), gameType: 2 = regular season
+        const currentSeason = '20242025';
+        const skaterUrl = `https://api-web.nhle.com/v1/skater-stats-leaders/${currentSeason}/2?categories=points,goals,assists&limit=30`;
         let skaterLeaders = [];
 
         try {
             const skaterData = await fetchJSON(skaterUrl);
 
-            // Process each category
-            for (const category of ['points', 'goals', 'assists', 'plusMinus']) {
+            // Process each category - NHL API response structure
+            for (const category of ['points', 'goals', 'assists']) {
                 if (skaterData[category]) {
                     for (const player of skaterData[category].slice(0, 20)) {
+                        const gamesPlayed = player.gamesPlayed || 60;
                         skaterLeaders.push({
                             player: `${player.firstName?.default || ''} ${player.lastName?.default || ''}`.trim(),
-                            team: player.teamAbbrev?.default || player.teamAbbrev,
+                            team: player.teamAbbrev,  // Direct string, not nested .default
                             category: category,
                             value: player.value,
-                            gamesPlayed: player.gamesPlayed || 82,
-                            perGame: (player.value / (player.gamesPlayed || 82)).toFixed(2),
-                            headshot: player.headshot
+                            gamesPlayed: gamesPlayed,
+                            perGame: (player.value / gamesPlayed).toFixed(2),
+                            headshot: player.headshot,
+                            position: player.positionCode || 'F'
                         });
                     }
                 }
             }
+            console.log(`✅ NHL Skater stats: ${skaterLeaders.length} leaders loaded from official API`);
         } catch (e) {
             console.log(`  ⚠️ Could not fetch skater stats: ${e.message}`);
         }
 
-        // Get goalie stats
-        const goalieUrl = 'https://api-web.nhle.com/v1/goalie-stats-leaders/current?categories=wins,savePctg&limit=20';
+        // Get goalie stats - also use season/gameType format
+        const goalieUrl = `https://api-web.nhle.com/v1/goalie-stats-leaders/${currentSeason}/2?categories=wins,savePctg&limit=20`;
         let goalieLeaders = [];
 
         try {
@@ -4605,7 +4610,7 @@ async function fetchNHLPlayerStats() {
                     for (const player of goalieData[category].slice(0, 10)) {
                         goalieLeaders.push({
                             player: `${player.firstName?.default || ''} ${player.lastName?.default || ''}`.trim(),
-                            team: player.teamAbbrev?.default || player.teamAbbrev,
+                            team: player.teamAbbrev,  // Direct string, not nested .default
                             category: category,
                             value: player.value,
                             gamesPlayed: player.gamesPlayed || 50,
@@ -4614,6 +4619,7 @@ async function fetchNHLPlayerStats() {
                     }
                 }
             }
+            console.log(`✅ NHL Goalie stats: ${goalieLeaders.length} leaders loaded`);
         } catch (e) {
             console.log(`  ⚠️ Could not fetch goalie stats: ${e.message}`);
         }
