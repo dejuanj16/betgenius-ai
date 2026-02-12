@@ -34,7 +34,11 @@ async function checkServerConnection() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-        const response = await fetch('http://localhost:3001/health', {
+        // Use relative URL for production, localhost for dev
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const healthUrl = isLocalhost ? 'http://localhost:3001/health' : '/health';
+
+        const response = await fetch(healthUrl, {
             method: 'GET',
             mode: 'cors',
             signal: controller.signal
@@ -44,7 +48,7 @@ async function checkServerConnection() {
 
         if (response.ok) {
             const data = await response.json();
-            console.log('✅ Proxy server connected:', data.status);
+            console.log('✅ Server connected:', data.status);
             // Server is connected
             state.serverConnected = true;
             banner.style.display = 'none';
@@ -55,7 +59,7 @@ async function checkServerConnection() {
         }
     } catch (error) {
         // Server not available - show banner briefly then hide
-        console.warn('⚠️ Proxy server not available - using demo mode');
+        console.warn('⚠️ Server not available - using demo mode');
         state.serverConnected = false;
 
         // Update banner text to indicate demo mode

@@ -103,7 +103,10 @@ window.DataSourceBanner = DataSourceBanner;
 // API Configuration
 const API_CONFIG = {
     // Proxy server for API calls (bypasses CORS)
-    PROXY_BASE: 'http://localhost:3001',
+    // Use relative URL for production, localhost for dev
+    PROXY_BASE: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:3001'
+        : '',
 
     // Direct Odds API (used by proxy server, NOT browser)
     ODDS_API_BASE: 'https://api.the-odds-api.com/v4',

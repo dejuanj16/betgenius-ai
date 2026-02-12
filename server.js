@@ -279,15 +279,18 @@ const RECENT_PLAYER_MOVES = {
     'Mikal Bridges': { team: 'NYK', fullTeam: 'New York Knicks', position: 'SF', sport: 'nba' },
     'OG Anunoby': { team: 'NYK', fullTeam: 'New York Knicks', position: 'SF', sport: 'nba' },
 
-    // DALLAS MAVERICKS - Klay Thompson (from Golden State)
+    // DALLAS MAVERICKS - Klay Thompson (from Golden State), Kris Middleton trade
     'Klay Thompson': { team: 'DAL', fullTeam: 'Dallas Mavericks', position: 'SG', sport: 'nba' },
+    'Kris Middleton': { team: 'DAL', fullTeam: 'Dallas Mavericks', position: 'SF', sport: 'nba' },
+    'Khris Middleton': { team: 'DAL', fullTeam: 'Dallas Mavericks', position: 'SF', sport: 'nba' }, // Alt spelling
 
     // PHOENIX SUNS - Verify roster
     'Devin Booker': { team: 'PHX', fullTeam: 'Phoenix Suns', position: 'SG', sport: 'nba' },
 
-    // MILWAUKEE BUCKS - Myles Turner trade (from Indiana)
+    // MILWAUKEE BUCKS - Myles Turner trade (from Indiana), Cam Thomas trade (from Brooklyn)
     'Giannis Antetokounmpo': { team: 'MIL', fullTeam: 'Milwaukee Bucks', position: 'PF', sport: 'nba' },
     'Myles Turner': { team: 'MIL', fullTeam: 'Milwaukee Bucks', position: 'C', sport: 'nba' },
+    'Cam Thomas': { team: 'MIL', fullTeam: 'Milwaukee Bucks', position: 'SG', sport: 'nba' },
 
     // MEMPHIS GRIZZLIES - After JJJ trade
     'Ja Morant': { team: 'MEM', fullTeam: 'Memphis Grizzlies', position: 'PG', sport: 'nba' },

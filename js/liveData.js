@@ -6,8 +6,9 @@
 
 class LiveDataService {
     constructor() {
-        // Proxy server URL (run node server.js to start)
-        this.proxyBase = 'http://localhost:3001';
+        // Proxy server URL - use relative URL for production, localhost for dev
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        this.proxyBase = isLocalhost ? 'http://localhost:3001' : '';
         this.useProxy = true; // Set to true to use proxy server
 
         // API Endpoints (ESPN is CORS-friendly, no key needed)

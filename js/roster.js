@@ -27,6 +27,9 @@ const PRIORITY_ROSTER_OVERRIDES = {
     'Michael Porter Jr.': { team: 'Brooklyn Nets', abbr: 'BKN', position: 'SF', sport: 'nba' },
     'Michael Porter': { team: 'Brooklyn Nets', abbr: 'BKN', position: 'SF', sport: 'nba' },
     'Myles Turner': { team: 'Milwaukee Bucks', abbr: 'MIL', position: 'C', sport: 'nba' },
+    'Cam Thomas': { team: 'Milwaukee Bucks', abbr: 'MIL', position: 'SG', sport: 'nba' },
+    'Kris Middleton': { team: 'Dallas Mavericks', abbr: 'DAL', position: 'SF', sport: 'nba' },
+    'Khris Middleton': { team: 'Dallas Mavericks', abbr: 'DAL', position: 'SF', sport: 'nba' },
     'Fred VanVleet': { team: 'Houston Rockets', abbr: 'HOU', position: 'PG', sport: 'nba', injured: true },
     'Malik Beasley': { team: 'Free Agent', abbr: 'FA', position: 'SG', sport: 'nba', freeAgent: true }
 };
