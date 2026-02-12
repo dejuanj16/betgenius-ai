@@ -295,8 +295,16 @@ const RECENT_PLAYER_MOVES = {
     // MEMPHIS GRIZZLIES - After JJJ trade
     'Ja Morant': { team: 'MEM', fullTeam: 'Memphis Grizzlies', position: 'PG', sport: 'nba' },
 
-    // CHICAGO BULLS - Anfernee Simons trade (from Portland)
+    // CHICAGO BULLS - Josh Giddey, Anfernee Simons, Rob Dillingham, Jaden Ivey trades
+    'Josh Giddey': { team: 'CHI', fullTeam: 'Chicago Bulls', position: 'G', sport: 'nba' },
     'Anfernee Simons': { team: 'CHI', fullTeam: 'Chicago Bulls', position: 'SG', sport: 'nba' },
+    'Rob Dillingham': { team: 'CHI', fullTeam: 'Chicago Bulls', position: 'G', sport: 'nba' },
+    'Jaden Ivey': { team: 'CHI', fullTeam: 'Chicago Bulls', position: 'G', sport: 'nba' },
+    'Collin Sexton': { team: 'CHI', fullTeam: 'Chicago Bulls', position: 'G', sport: 'nba' },
+
+    // MILWAUKEE BUCKS - Kyle Kuzma trade
+    'Kyle Kuzma': { team: 'MIL', fullTeam: 'Milwaukee Bucks', position: 'F', sport: 'nba' },
+    'Gary Trent Jr.': { team: 'MIL', fullTeam: 'Milwaukee Bucks', position: 'G', sport: 'nba' },
 
     // CHARLOTTE HORNETS - Coby White trade (from Chicago)
     'Coby White': { team: 'CHA', fullTeam: 'Charlotte Hornets', position: 'PG', sport: 'nba' },
