@@ -713,15 +713,23 @@ class SportsAPIService {
             }
 
             // If proxy returned props directly, use them
-            if (propsData && Array.isArray(propsData)) {
+            // Handle both array format and object format with .props property
+            let propsArray = propsData;
+            if (propsData && propsData.props && Array.isArray(propsData.props)) {
+                // New format: {source, propsCount, props: [...]}
+                propsArray = propsData.props;
+                console.log(`📊 Received ${propsData.propsCount || propsArray.length} props from ${propsData.source || 'server'}`);
+            }
+            
+            if (propsArray && Array.isArray(propsArray)) {
                 // Check if array is empty (could be rate limit or no data)
-                if (propsData.length === 0) {
-                    console.warn('No props data returned, using demo data');
-                    return this.getDemoPlayerProps(sport);
+                if (propsArray.length === 0) {
+                    console.warn('No props data returned');
+                    return [];
                 }
 
                 // Format the props from the proxy response
-                const flatProps = this.formatPropsFromProxy(propsData, sport);
+                const flatProps = this.formatPropsFromProxy(propsArray, sport);
 
                 // Add sport identifier to each prop
                 const propsWithSport = flatProps.map(prop => ({
@@ -734,8 +742,9 @@ class SportsAPIService {
                 return propsWithSport;
             }
 
-            // Fallback to demo data if proxy returns unexpected format
-            return this.getDemoPlayerProps(sport);
+            // No props available
+            console.log('No props available for', sport);
+            return [];
         } catch (error) {
             console.error('Error fetching player props:', error);
 

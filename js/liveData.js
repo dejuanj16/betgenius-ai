@@ -169,12 +169,26 @@ class LiveDataService {
                 if (!response.ok) continue;
 
                 const data = await response.json();
-                if (data && Array.isArray(data)) {
-                    data.forEach(eventData => {
-                        if (eventData.odds && eventData.odds.bookmakers) {
-                            const props = this.processPlayerProps(eventData.odds, sport);
-                            props.forEach(prop => {
-                                this.playerProps.set(`${prop.player}_${sport}`, prop);
+                
+                // Handle both array format and object format with .props property
+                let propsArray = data;
+                if (data && data.props && Array.isArray(data.props)) {
+                    // New format: {source, propsCount, props: [...]}
+                    propsArray = data.props;
+                }
+                
+                if (propsArray && Array.isArray(propsArray)) {
+                    propsArray.forEach(prop => {
+                        // Handle both direct prop objects and eventData format
+                        if (prop.player) {
+                            // Direct prop object from our API
+                            this.playerProps.set(`${prop.player}_${sport}`, prop);
+                            totalProps++;
+                        } else if (prop.odds && prop.odds.bookmakers) {
+                            // Legacy eventData format
+                            const processedProps = this.processPlayerProps(prop.odds, sport);
+                            processedProps.forEach(p => {
+                                this.playerProps.set(`${p.player}_${sport}`, p);
                                 totalProps++;
                             });
                         }
