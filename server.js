@@ -9,6 +9,200 @@ const fs = require('fs');
 const path = require('path');
 
 // =====================================================
+// ANALYTICS DATA STORAGE
+// File-based persistence for analytics data
+// =====================================================
+
+const ANALYTICS_FILE = path.join(__dirname, 'data', 'analytics.json');
+const ANALYTICS_EVENTS_FILE = path.join(__dirname, 'data', 'analytics_events.json');
+
+// Ensure data directory exists
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+}
+
+// In-memory analytics cache
+let analyticsCache = {
+    totalSessions: 0,
+    totalEvents: 0,
+    uniqueUsers: 0,
+    featureUsage: {},
+    dailyStats: {},
+    topEvents: [],
+    lastUpdated: null
+};
+
+// Load analytics from file on startup
+function loadAnalyticsFromFile() {
+    try {
+        if (fs.existsSync(ANALYTICS_FILE)) {
+            const data = fs.readFileSync(ANALYTICS_FILE, 'utf8');
+            analyticsCache = JSON.parse(data);
+            console.log('📊 Analytics loaded from file');
+        }
+    } catch (e) {
+        console.warn('⚠️ Could not load analytics file:', e.message);
+    }
+}
+
+// Save analytics to file
+function saveAnalyticsToFile() {
+    try {
+        analyticsCache.lastUpdated = new Date().toISOString();
+        fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(analyticsCache, null, 2));
+    } catch (e) {
+        console.warn('⚠️ Could not save analytics:', e.message);
+    }
+}
+
+// Save analytics data from frontend
+async function saveAnalyticsData(data) {
+    try {
+        const { sessionId, events, summary } = data;
+
+        // Update totals
+        analyticsCache.totalSessions++;
+        analyticsCache.totalEvents += (events?.length || 0);
+
+        // Update feature usage
+        if (summary?.eventTypes) {
+            Object.entries(summary.eventTypes).forEach(([event, count]) => {
+                analyticsCache.featureUsage[event] =
+                    (analyticsCache.featureUsage[event] || 0) + count;
+            });
+        }
+
+        // Update daily stats
+        const today = new Date().toISOString().split('T')[0];
+        if (!analyticsCache.dailyStats[today]) {
+            analyticsCache.dailyStats[today] = { sessions: 0, events: 0 };
+        }
+        analyticsCache.dailyStats[today].sessions++;
+        analyticsCache.dailyStats[today].events += (events?.length || 0);
+
+        // Keep only last 30 days
+        const dates = Object.keys(analyticsCache.dailyStats).sort();
+        if (dates.length > 30) {
+            dates.slice(0, dates.length - 30).forEach(d => {
+                delete analyticsCache.dailyStats[d];
+            });
+        }
+
+        // Update top events
+        analyticsCache.topEvents = Object.entries(analyticsCache.featureUsage)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 20)
+            .map(([event, count]) => ({ event, count }));
+
+        // Save recent events (last 1000)
+        await appendEvents(events);
+
+        // Save to file
+        saveAnalyticsToFile();
+
+        console.log(`📊 Analytics saved: ${events?.length || 0} events from session ${sessionId}`);
+        return true;
+    } catch (e) {
+        console.error('Analytics save error:', e.message);
+        return false;
+    }
+}
+
+// Append events to events file (keeps last 1000)
+async function appendEvents(newEvents) {
+    if (!newEvents || newEvents.length === 0) return;
+
+    try {
+        let existingEvents = [];
+        if (fs.existsSync(ANALYTICS_EVENTS_FILE)) {
+            const data = fs.readFileSync(ANALYTICS_EVENTS_FILE, 'utf8');
+            existingEvents = JSON.parse(data);
+        }
+
+        // Add new events and keep last 1000
+        existingEvents.push(...newEvents);
+        if (existingEvents.length > 1000) {
+            existingEvents = existingEvents.slice(-1000);
+        }
+
+        fs.writeFileSync(ANALYTICS_EVENTS_FILE, JSON.stringify(existingEvents, null, 2));
+    } catch (e) {
+        console.warn('Could not append events:', e.message);
+    }
+}
+
+// Get aggregated analytics
+async function getAggregatedAnalytics() {
+    return {
+        overview: {
+            totalSessions: analyticsCache.totalSessions,
+            totalEvents: analyticsCache.totalEvents,
+            uniqueUsers: analyticsCache.uniqueUsers,
+            lastUpdated: analyticsCache.lastUpdated
+        },
+        featureUsage: analyticsCache.featureUsage,
+        topEvents: analyticsCache.topEvents,
+        dailyStats: analyticsCache.dailyStats
+    };
+}
+
+// Get quick summary
+async function getAnalyticsSummary() {
+    const today = new Date().toISOString().split('T')[0];
+    const todayStats = analyticsCache.dailyStats[today] || { sessions: 0, events: 0 };
+
+    return {
+        total: {
+            sessions: analyticsCache.totalSessions,
+            events: analyticsCache.totalEvents
+        },
+        today: todayStats,
+        topFeatures: analyticsCache.topEvents.slice(0, 5),
+        lastUpdated: analyticsCache.lastUpdated
+    };
+}
+
+// Get recent events
+async function getRecentEvents(limit = 100) {
+    try {
+        if (fs.existsSync(ANALYTICS_EVENTS_FILE)) {
+            const data = fs.readFileSync(ANALYTICS_EVENTS_FILE, 'utf8');
+            const events = JSON.parse(data);
+            return events.slice(-limit).reverse();
+        }
+    } catch (e) {
+        console.warn('Could not read events:', e.message);
+    }
+    return [];
+}
+
+// Clear all analytics data
+async function clearAnalyticsData() {
+    analyticsCache = {
+        totalSessions: 0,
+        totalEvents: 0,
+        uniqueUsers: 0,
+        featureUsage: {},
+        dailyStats: {},
+        topEvents: [],
+        lastUpdated: null
+    };
+
+    try {
+        if (fs.existsSync(ANALYTICS_FILE)) fs.unlinkSync(ANALYTICS_FILE);
+        if (fs.existsSync(ANALYTICS_EVENTS_FILE)) fs.unlinkSync(ANALYTICS_EVENTS_FILE);
+    } catch (e) {
+        console.warn('Could not delete analytics files:', e.message);
+    }
+
+    console.log('📊 Analytics data cleared');
+}
+
+// Load analytics on startup
+loadAnalyticsFromFile();
+
+// =====================================================
 // LIVE ROSTER CACHE SYSTEM
 // Fetches and caches current player team assignments daily
 // =====================================================
@@ -2175,6 +2369,61 @@ const server = http.createServer(async (req, res) => {
                 },
                 cachedSports: Object.keys(propsCache)
             }));
+            return;
+        }
+
+        // =====================================================
+        // ANALYTICS API ENDPOINTS
+        // =====================================================
+
+        // POST /api/analytics - Receive analytics data from frontend
+        if (path === '/api/analytics' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', async () => {
+                try {
+                    const analyticsData = JSON.parse(body);
+                    await saveAnalyticsData(analyticsData);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, message: 'Analytics data saved' }));
+                } catch (e) {
+                    console.error('Analytics save error:', e.message);
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid analytics data' }));
+                }
+            });
+            return;
+        }
+
+        // GET /api/analytics - Get aggregated analytics data
+        if (path === '/api/analytics' && req.method === 'GET') {
+            const analytics = await getAggregatedAnalytics();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(analytics));
+            return;
+        }
+
+        // GET /api/analytics/summary - Get quick summary stats
+        if (path === '/api/analytics/summary') {
+            const summary = await getAnalyticsSummary();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(summary));
+            return;
+        }
+
+        // GET /api/analytics/events - Get recent events
+        if (path === '/api/analytics/events') {
+            const events = await getRecentEvents();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(events));
+            return;
+        }
+
+        // DELETE /api/analytics - Clear all analytics data
+        if (path === '/api/analytics' && req.method === 'DELETE') {
+            await clearAnalyticsData();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, message: 'Analytics data cleared' }));
             return;
         }
 
