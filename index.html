@@ -512,6 +512,7 @@
 
     <!-- Load only essential scripts for now -->
     <script src="js/demoData.js?v=3"></script>
+    <script src="js/analytics.js?v=1"></script>
     <script src="js/liveOdds.js?v=3"></script>
     <script>
         // Minimal app initialization that WORKS
@@ -772,6 +773,11 @@
         function filterByGame(sport, teams, matchup) {
             console.log(`🎯 Filtering props for: ${matchup} (${sport.toUpperCase()})`, teams);
 
+            // Track game click
+            if (window.BetGeniusAnalytics) {
+                window.BetGeniusAnalytics.trackGameClick(sport, matchup, teams);
+            }
+
             selectedGameFilter = { sport, teams, matchup };
 
             // Re-render with filter applied
@@ -923,6 +929,12 @@
                     currentSport = this.dataset.sport;
                     document.querySelectorAll('.sport-btn').forEach(b => b.classList.remove('active'));
                     this.classList.add('active');
+
+                    // Track sport filter
+                    if (window.BetGeniusAnalytics) {
+                        window.BetGeniusAnalytics.trackSportFilter(currentSport);
+                    }
+
                     renderAllProps();
                 });
             });

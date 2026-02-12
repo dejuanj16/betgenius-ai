@@ -50,6 +50,12 @@ class ParlayBuilder {
         this.legs.push(leg);
         this.updateUI();
         this.saveTempParlay();
+        
+        // Track analytics
+        if (window.BetGeniusAnalytics) {
+            window.BetGeniusAnalytics.trackParlayAdd(prop);
+        }
+        
         this.showToast(`Added ${prop.player} ${prop.propType} to parlay`, 'success');
         return true;
     }
