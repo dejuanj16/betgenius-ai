@@ -9320,13 +9320,13 @@ async function getGeneratedProps(sport) {
     let injuries = [];
     try {
         // Fetch today's games from ESPN
-        const sportPaths = { 
-            nba: 'basketball/nba', 
+        const sportPaths = {
+            nba: 'basketball/nba',
             ncaab: 'basketball/mens-college-basketball',
-            nfl: 'football/nfl', 
+            nfl: 'football/nfl',
             ncaaf: 'football/college-football',
-            nhl: 'hockey/nhl', 
-            mlb: 'baseball/mlb' 
+            nhl: 'hockey/nhl',
+            mlb: 'baseball/mlb'
         };
         const sportPath = sportPaths[sport];
         if (sportPath) {
@@ -9465,6 +9465,121 @@ async function getGeneratedProps(sport) {
                 props: [],
                 note: 'NFL Offseason - No games available. Check back when the season starts!'
             };
+        }
+    }
+
+    // COLLEGE SPORTS: Special handling - only fetch rosters for teams playing today
+    if (sport === 'ncaab' || sport === 'ncaaf') {
+        try {
+            const sportPaths = {
+                ncaab: 'basketball/mens-college-basketball',
+                ncaaf: 'football/college-football'
+            };
+            const sportPath = sportPaths[sport];
+
+            // Get today's games first
+            const scoresUrl = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/scoreboard?limit=50`;
+            const scoresData = await fetchJSON(scoresUrl);
+
+            if (!scoresData?.events || scoresData.events.length === 0) {
+                console.log(`📅 No ${sport.toUpperCase()} games today`);
+                return {
+                    source: `${sport}_no_games`,
+                    propsCount: 0,
+                    props: [],
+                    note: `No ${sport.toUpperCase()} games scheduled for today`
+                };
+            }
+
+            console.log(`🏀 Found ${scoresData.events.length} ${sport.toUpperCase()} games today, fetching rosters...`);
+
+            // Get unique team IDs from today's games
+            const teamIds = new Set();
+            const teamsInfo = {};
+            for (const event of scoresData.events) {
+                const competitors = event.competitions?.[0]?.competitors || [];
+                for (const comp of competitors) {
+                    const team = comp.team;
+                    if (team?.id) {
+                        teamIds.add(team.id);
+                        teamsInfo[team.id] = {
+                            id: team.id,
+                            name: team.displayName,
+                            abbreviation: team.abbreviation,
+                            logo: team.logo
+                        };
+                    }
+                }
+            }
+
+            console.log(`📋 Fetching rosters for ${teamIds.size} teams playing today...`);
+
+            // Fetch rosters only for teams playing today (max 20 to avoid timeout)
+            const players = [];
+            const teamIdsArray = Array.from(teamIds).slice(0, 20);
+
+            for (const teamId of teamIdsArray) {
+                try {
+                    const rosterUrl = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/teams/${teamId}/roster`;
+                    const rosterData = await fetchJSON(rosterUrl);
+
+                    let athleteList = [];
+                    if (Array.isArray(rosterData.athletes)) {
+                        if (rosterData.athletes[0]?.displayName || rosterData.athletes[0]?.fullName) {
+                            athleteList = rosterData.athletes;
+                        } else if (rosterData.athletes[0]?.items || rosterData.athletes[0]?.athletes) {
+                            rosterData.athletes.forEach(group => {
+                                const groupPlayers = group.items || group.athletes || [];
+                                athleteList = athleteList.concat(groupPlayers);
+                            });
+                        }
+                    }
+
+                    const teamInfo = teamsInfo[teamId] || {};
+                    athleteList.slice(0, 5).forEach(player => { // Top 5 players per team
+                        if (player.displayName || player.fullName) {
+                            players.push({
+                                id: player.id,
+                                name: player.displayName || player.fullName,
+                                team: teamInfo.abbreviation,
+                                fullTeam: teamInfo.name,
+                                position: player.position?.abbreviation || player.position?.name || 'G/F',
+                                headshot: player.headshot?.href
+                            });
+                        }
+                    });
+                } catch (e) {
+                    // Skip teams with roster errors
+                }
+            }
+
+            if (players.length > 0) {
+                console.log(`✅ Found ${players.length} players from ${sport.toUpperCase()} teams playing today`);
+
+                // Generate props from these players
+                const estimatedStats = players.slice(0, 50).map(player => ({
+                    playerId: player.id,
+                    playerName: player.name,
+                    team: player.team,
+                    fullTeam: player.fullTeam,
+                    position: player.position,
+                    headshot: player.headshot,
+                    ...getEstimatedStats(sport, player.position)
+                }));
+
+                const props = generatePropsFromStats(estimatedStats, sport);
+                const result = {
+                    source: `${sport}_generated`,
+                    propsCount: props.length,
+                    props: props,
+                    note: `Props for ${sport.toUpperCase()} teams playing today`
+                };
+                propsCache[cacheKey] = { data: result, timestamp: Date.now() };
+                console.log(`✅ Generated ${props.length} ${sport.toUpperCase()} props`);
+                return result;
+            }
+        } catch (e) {
+            console.log(`⚠️ ${sport.toUpperCase()} props generation failed: ${e.message}`);
         }
     }
 
