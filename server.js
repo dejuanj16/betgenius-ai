@@ -221,6 +221,14 @@ const LIVE_ROSTER_CACHE = {
     lastSyncStatus: 'pending'
 };
 
+// Legacy roster cache (used by updateRosterCache function)
+const ROSTER_CACHE = {
+    nba: { players: new Map(), lastUpdated: null },
+    nfl: { players: new Map(), lastUpdated: null },
+    nhl: { players: new Map(), lastUpdated: null },
+    mlb: { players: new Map(), lastUpdated: null }
+};
+
 // ESPN API team IDs for each sport
 const ESPN_TEAM_IDS = {
     nba: [
