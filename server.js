@@ -387,8 +387,11 @@ async function syncAllRostersFromESPN() {
         // Sync NBA (primary focus)
         const nbaCount = await syncSportRostersFromESPN('nba');
 
-        // Could add NFL/NHL/MLB here when needed
-        // const nflCount = await syncSportRostersFromESPN('nfl');
+        // Sync NHL (in season)
+        const nhlCount = await syncSportRostersFromESPN('nhl');
+
+        // Sync NFL (offseason, but sync anyway for future)
+        const nflCount = await syncSportRostersFromESPN('nfl');
 
         LIVE_ROSTER_CACHE.lastUpdated = new Date().toISOString();
         LIVE_ROSTER_CACHE.lastSyncStatus = 'success';
@@ -400,11 +403,13 @@ async function syncAllRostersFromESPN() {
         console.log('🔄 ========================================');
         console.log(`✅ ROSTER SYNC COMPLETE in ${elapsed}s`);
         console.log(`   NBA: ${nbaCount} players`);
+        console.log(`   NHL: ${nhlCount} players`);
+        console.log(`   NFL: ${nflCount} players`);
         console.log(`   Last updated: ${LIVE_ROSTER_CACHE.lastUpdated}`);
         console.log('🔄 ========================================');
         console.log('');
 
-        return { success: true, nba: nbaCount, timestamp: LIVE_ROSTER_CACHE.lastUpdated };
+        return { success: true, nba: nbaCount, nhl: nhlCount, nfl: nflCount, timestamp: LIVE_ROSTER_CACHE.lastUpdated };
     } catch (e) {
         console.error('❌ Roster sync failed:', e.message);
         LIVE_ROSTER_CACHE.lastSyncStatus = 'error: ' + e.message;
@@ -5877,8 +5882,8 @@ async function fetchNHLOfficialData() {
             }));
             skaterLeaders = goalsData.concat(assistsData, pointsData);
             console.log(`✅ NHL Skater stats: ${skaterLeaders.length} leaders loaded`);
-        } catch (e) { 
-            console.log('⚠️ NHL Skater stats unavailable, trying ESPN fallback...'); 
+        } catch (e) {
+            console.log('⚠️ NHL Skater stats unavailable, trying ESPN fallback...');
         }
 
         try {
@@ -5899,14 +5904,14 @@ async function fetchNHLOfficialData() {
                 console.log('🏒 Fetching NHL stats from ESPN...');
                 const espnUrl = 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/statistics';
                 const espnData = await fetchJSON(espnUrl);
-                
+
                 for (const category of (espnData.categories || [])) {
                     const catName = category.displayName || category.name || '';
                     for (const leader of (category.leaders || []).slice(0, 20)) {
                         const athlete = leader.athlete || {};
                         const team = athlete.team || {};
                         const stats = leader.statistics || [];
-                        
+
                         espnLeaders.push({
                             name: athlete.displayName || athlete.fullName,
                             team: team.abbreviation,
