@@ -243,8 +243,32 @@ const ESPN_TEAM_IDS = {
         { id: 24, abbr: 'SAC' }, { id: 25, abbr: 'SAS' }, { id: 28, abbr: 'TOR' },
         { id: 26, abbr: 'UTA' }, { id: 27, abbr: 'WAS' }
     ],
-    nfl: [], // Add NFL teams as needed
-    nhl: [], // Add NHL teams as needed
+    nhl: [
+        { id: 1, abbr: 'BOS' }, { id: 2, abbr: 'BUF' }, { id: 3, abbr: 'CGY' },
+        { id: 4, abbr: 'CHI' }, { id: 5, abbr: 'DET' }, { id: 6, abbr: 'EDM' },
+        { id: 7, abbr: 'CAR' }, { id: 8, abbr: 'LA' }, { id: 9, abbr: 'DAL' },
+        { id: 10, abbr: 'MTL' }, { id: 11, abbr: 'NJ' }, { id: 12, abbr: 'NYI' },
+        { id: 13, abbr: 'NYR' }, { id: 14, abbr: 'OTT' }, { id: 15, abbr: 'PHI' },
+        { id: 16, abbr: 'PIT' }, { id: 17, abbr: 'COL' }, { id: 18, abbr: 'SJ' },
+        { id: 19, abbr: 'STL' }, { id: 20, abbr: 'TB' }, { id: 21, abbr: 'TOR' },
+        { id: 22, abbr: 'VAN' }, { id: 23, abbr: 'WSH' }, { id: 24, abbr: 'ARI' },
+        { id: 25, abbr: 'ANA' }, { id: 26, abbr: 'FLA' }, { id: 27, abbr: 'NSH' },
+        { id: 28, abbr: 'WPG' }, { id: 29, abbr: 'CBJ' }, { id: 30, abbr: 'MIN' },
+        { id: 52, abbr: 'SEA' }, { id: 54, abbr: 'VGK' }
+    ],
+    nfl: [
+        { id: 1, abbr: 'ATL' }, { id: 2, abbr: 'BUF' }, { id: 3, abbr: 'CHI' },
+        { id: 4, abbr: 'CIN' }, { id: 5, abbr: 'CLE' }, { id: 6, abbr: 'DAL' },
+        { id: 7, abbr: 'DEN' }, { id: 8, abbr: 'DET' }, { id: 9, abbr: 'GB' },
+        { id: 10, abbr: 'TEN' }, { id: 11, abbr: 'IND' }, { id: 12, abbr: 'KC' },
+        { id: 13, abbr: 'LV' }, { id: 14, abbr: 'LAR' }, { id: 15, abbr: 'MIA' },
+        { id: 16, abbr: 'MIN' }, { id: 17, abbr: 'NE' }, { id: 18, abbr: 'NO' },
+        { id: 19, abbr: 'NYG' }, { id: 20, abbr: 'NYJ' }, { id: 21, abbr: 'PHI' },
+        { id: 22, abbr: 'ARI' }, { id: 23, abbr: 'PIT' }, { id: 24, abbr: 'LAC' },
+        { id: 25, abbr: 'SF' }, { id: 26, abbr: 'SEA' }, { id: 27, abbr: 'TB' },
+        { id: 28, abbr: 'WSH' }, { id: 29, abbr: 'CAR' }, { id: 30, abbr: 'JAX' },
+        { id: 33, abbr: 'BAL' }, { id: 34, abbr: 'HOU' }
+    ],
     mlb: []  // Add MLB teams as needed
 };
 
@@ -5593,8 +5617,13 @@ function generatePropsFromRealStats(stats, sport, gameContext = {}) {
         }
     }
 
-    if (sport === 'nhl' && stats.skaterLeaders) {
-        for (const player of stats.skaterLeaders.slice(0, 40)) {
+    if (sport === 'nhl' && (stats.skaterLeaders || stats.espnLeaders)) {
+        // Combine NHL official API data with ESPN data for reliability
+        const leaders = stats.skaterLeaders || [];
+        const espnLeaders = stats.espnLeaders || [];
+
+        // Process NHL official API data
+        for (const player of leaders.slice(0, 40)) {
             const perGame = parseFloat(player.perGame) || 0;
             if (perGame <= 0) continue;
 
@@ -5632,6 +5661,66 @@ function generatePropsFromRealStats(stats, sport, gameContext = {}) {
                 over: generateBookOddsAccurate(-110),
                 under: generateBookOddsAccurate(-110),
                 source: 'nhl_official_stats',
+                lastUpdated: new Date().toISOString()
+            });
+        }
+
+        // Also process ESPN leaders if available (fallback/supplement)
+        for (const player of espnLeaders.slice(0, 50)) {
+            // Skip if we already have this player
+            const existingPlayer = props.find(p => p.player === player.name && p.propType === player.category);
+            if (existingPlayer) continue;
+
+            const perGame = player.perGame || 0;
+            if (perGame <= 0) continue;
+
+            let propType = '';
+            let variance = 0.3;
+
+            if (player.category === 'goals' || player.category === 'Goals') {
+                propType = 'Goals';
+            } else if (player.category === 'assists' || player.category === 'Assists') {
+                propType = 'Assists';
+                variance = 0.4;
+            } else if (player.category === 'points' || player.category === 'Points') {
+                propType = 'Points';
+                variance = 0.5;
+            } else if (player.category === 'shots' || player.category === 'Shots On Goal') {
+                propType = 'Shots On Goal';
+                variance = 1.0;
+            } else {
+                continue;
+            }
+
+            const gameInfo = gamesByTeam[player.team] || {};
+            const opponent = gameInfo.opponent;
+            const isHome = gameInfo.isHome;
+            const gameTime = gameInfo.startTime || null;
+
+            const line = Math.round(perGame * 2) / 2;
+            const prediction = generateAIPrediction(perGame, line, variance, 'nhl');
+
+            props.push({
+                player: player.name,
+                team: player.team,
+                fullTeam: player.fullTeam,
+                opponent: opponent || 'TBD',
+                isHome: isHome,
+                matchup: opponent ? `${isHome ? 'vs' : '@'} ${opponent}` : null,
+                gameTime: gameTime,
+                position: player.position || 'Skater',
+                headshot: player.headshot,
+                propType: propType,
+                line: line,
+                seasonAvg: perGame,
+                seasonTotal: player.total,
+                aiPick: prediction.pick,
+                confidence: prediction.confidence,
+                reasoning: `Season avg: ${perGame.toFixed(2)} per game`,
+                trend: prediction.trend,
+                over: generateBookOddsAccurate(-110),
+                under: generateBookOddsAccurate(-110),
+                source: 'espn_nhl_stats',
                 lastUpdated: new Date().toISOString()
             });
         }
@@ -5748,29 +5837,101 @@ async function fetchNHLOfficialData() {
             lastTen: `${team.l10Wins}-${team.l10Losses}-${team.l10OtLosses}`
         }));
 
-        // Get player stats leaders
+        // Get player stats leaders from NHL official API
         const skaterStatsUrl = 'https://api-web.nhle.com/v1/skater-stats-leaders/current';
         const goalieStatsUrl = 'https://api-web.nhle.com/v1/goalie-stats-leaders/current';
 
         let skaterLeaders = [];
         let goalieLeaders = [];
+        let espnLeaders = [];
 
         try {
             const skaterData = await fetchJSON(skaterStatsUrl);
-            skaterLeaders = (skaterData.goals || []).concat(skaterData.assists || [], skaterData.points || []);
-        } catch (e) { console.log('Skater stats unavailable'); }
+            // Parse NHL API response properly
+            const goalsData = (skaterData.goals || []).map(p => ({
+                player: p.firstName?.default + ' ' + p.lastName?.default,
+                team: p.teamAbbrev?.default || p.teamAbbrev,
+                value: p.value,
+                gamesPlayed: p.gamesPlayed,
+                perGame: p.gamesPlayed > 0 ? p.value / p.gamesPlayed : 0,
+                headshot: p.headshot,
+                category: 'goals'
+            }));
+            const assistsData = (skaterData.assists || []).map(p => ({
+                player: p.firstName?.default + ' ' + p.lastName?.default,
+                team: p.teamAbbrev?.default || p.teamAbbrev,
+                value: p.value,
+                gamesPlayed: p.gamesPlayed,
+                perGame: p.gamesPlayed > 0 ? p.value / p.gamesPlayed : 0,
+                headshot: p.headshot,
+                category: 'assists'
+            }));
+            const pointsData = (skaterData.points || []).map(p => ({
+                player: p.firstName?.default + ' ' + p.lastName?.default,
+                team: p.teamAbbrev?.default || p.teamAbbrev,
+                value: p.value,
+                gamesPlayed: p.gamesPlayed,
+                perGame: p.gamesPlayed > 0 ? p.value / p.gamesPlayed : 0,
+                headshot: p.headshot,
+                category: 'points'
+            }));
+            skaterLeaders = goalsData.concat(assistsData, pointsData);
+            console.log(`✅ NHL Skater stats: ${skaterLeaders.length} leaders loaded`);
+        } catch (e) { 
+            console.log('⚠️ NHL Skater stats unavailable, trying ESPN fallback...'); 
+        }
 
         try {
             const goalieData = await fetchJSON(goalieStatsUrl);
-            goalieLeaders = goalieData.wins || [];
+            goalieLeaders = (goalieData.wins || []).map(p => ({
+                player: p.firstName?.default + ' ' + p.lastName?.default,
+                team: p.teamAbbrev?.default || p.teamAbbrev,
+                value: p.value,
+                gamesPlayed: p.gamesPlayed,
+                headshot: p.headshot,
+                category: 'wins'
+            }));
         } catch (e) { console.log('Goalie stats unavailable'); }
+
+        // ESPN fallback for NHL stats if official API fails
+        if (skaterLeaders.length === 0) {
+            try {
+                console.log('🏒 Fetching NHL stats from ESPN...');
+                const espnUrl = 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/statistics';
+                const espnData = await fetchJSON(espnUrl);
+                
+                for (const category of (espnData.categories || [])) {
+                    const catName = category.displayName || category.name || '';
+                    for (const leader of (category.leaders || []).slice(0, 20)) {
+                        const athlete = leader.athlete || {};
+                        const team = athlete.team || {};
+                        const stats = leader.statistics || [];
+                        
+                        espnLeaders.push({
+                            name: athlete.displayName || athlete.fullName,
+                            team: team.abbreviation,
+                            fullTeam: team.displayName,
+                            position: athlete.position?.abbreviation,
+                            headshot: athlete.headshot?.href,
+                            category: catName,
+                            total: leader.value,
+                            perGame: stats.find(s => s.name === 'avgGoals' || s.name === 'avgPoints')?.value || (leader.value / 50),
+                        });
+                    }
+                }
+                console.log(`✅ ESPN NHL stats: ${espnLeaders.length} leaders loaded`);
+            } catch (e) {
+                console.log('ESPN NHL stats also unavailable:', e.message);
+            }
+        }
 
         const result = {
             games,
             standings,
             skaterLeaders: skaterLeaders.slice(0, 50),
             goalieLeaders: goalieLeaders.slice(0, 20),
-            source: 'nhl_official',
+            espnLeaders: espnLeaders,
+            source: skaterLeaders.length > 0 ? 'nhl_official' : (espnLeaders.length > 0 ? 'espn_nhl' : 'none'),
             gamesCount: games.length,
             timestamp: new Date().toISOString()
         };
