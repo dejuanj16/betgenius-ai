@@ -2740,7 +2740,7 @@ const server = http.createServer(async (req, res) => {
                     nhl: LIVE_ROSTER_CACHE.nhl.size,
                     mlb: LIVE_ROSTER_CACHE.mlb.size
                 },
-                nextSyncIn: LIVE_ROSTER_CACHE.lastUpdated 
+                nextSyncIn: LIVE_ROSTER_CACHE.lastUpdated
                     ? Math.max(0, Math.round((new Date(LIVE_ROSTER_CACHE.lastUpdated).getTime() + ROSTER_REFRESH_INTERVAL_MS - Date.now()) / 60000)) + ' minutes'
                     : 'pending'
             }));

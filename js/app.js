@@ -122,6 +122,139 @@ window.retryConnection = async function() {
 let minConfidence = 60;
 let autoRefreshInterval = null;
 let dataRefreshInterval = null;
+let lastKnownRosterSync = null;
+
+// =====================================================
+// ROSTER SYNC MONITORING
+// Auto-refreshes props when backend roster syncs
+// =====================================================
+
+async function initRosterSyncMonitor() {
+    console.log('📋 Initializing roster sync monitor...');
+
+    // Get initial roster sync status
+    try {
+        const status = await fetchRosterStatus();
+        if (status && status.lastUpdated) {
+            lastKnownRosterSync = status.lastUpdated;
+            console.log('📋 Initial roster sync time:', lastKnownRosterSync);
+        }
+    } catch (e) {
+        console.warn('📋 Could not get initial roster status');
+    }
+
+    // Check for roster updates every 5 minutes
+    setInterval(checkForRosterUpdates, 5 * 60 * 1000);
+}
+
+async function fetchRosterStatus() {
+    try {
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const baseUrl = isLocalhost ? 'http://localhost:3001' : '';
+
+        const response = await fetch(`${baseUrl}/api/rosters/status`, {
+            signal: AbortSignal.timeout(5000)
+        });
+
+        if (response.ok) {
+            return await response.json();
+        }
+    } catch (e) {
+        console.warn('📋 Roster status check failed:', e.message);
+    }
+    return null;
+}
+
+async function checkForRosterUpdates() {
+    console.log('📋 Checking for roster updates...');
+
+    const status = await fetchRosterStatus();
+    if (!status || !status.lastUpdated) return;
+
+    // If roster has been updated since we last checked
+    if (lastKnownRosterSync && status.lastUpdated !== lastKnownRosterSync) {
+        console.log('🔄 New roster sync detected! Refreshing props...');
+        lastKnownRosterSync = status.lastUpdated;
+
+        // Show notification to user
+        if (window.ToastManager) {
+            window.ToastManager.info('Roster Updated', 'Fresh roster data loaded. Refreshing props...', 3000);
+        }
+
+        // Trigger props refresh
+        await refreshPropsAfterRosterSync();
+    } else {
+        lastKnownRosterSync = status.lastUpdated;
+    }
+}
+
+async function refreshPropsAfterRosterSync() {
+    try {
+        // Clear any cached props
+        if (window.SportsAPI && window.SportsAPI.clearCache) {
+            window.SportsAPI.clearCache();
+        }
+
+        // Reload props
+        if (typeof loadPlayerProps === 'function') {
+            await loadPlayerProps();
+        } else if (typeof loadAllData === 'function') {
+            await loadAllData();
+        }
+
+        console.log('✅ Props refreshed after roster sync');
+
+        // Track this event
+        if (window.BetGeniusAnalytics) {
+            window.BetGeniusAnalytics.trackEvent('roster_sync_refresh');
+        }
+    } catch (e) {
+        console.error('❌ Failed to refresh props after roster sync:', e);
+    }
+}
+
+// Manual roster sync trigger (can be called from console)
+window.forceRosterSync = async function() {
+    console.log('📋 Forcing roster sync...');
+
+    try {
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const baseUrl = isLocalhost ? 'http://localhost:3001' : '';
+
+        const response = await fetch(`${baseUrl}/api/rosters/sync`, {
+            method: 'POST',
+            signal: AbortSignal.timeout(60000) // 60 second timeout for full sync
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            console.log('✅ Roster sync complete:', result);
+
+            if (window.ToastManager) {
+                window.ToastManager.success('Roster Synced', `${result.nba || 0} NBA players updated`);
+            }
+
+            // Refresh props with new roster
+            await refreshPropsAfterRosterSync();
+            return result;
+        } else {
+            throw new Error(`Server returned ${response.status}`);
+        }
+    } catch (e) {
+        console.error('❌ Roster sync failed:', e);
+        if (window.ToastManager) {
+            window.ToastManager.error('Sync Failed', e.message);
+        }
+        return { error: e.message };
+    }
+};
+
+// Get current roster status (can be called from console)
+window.getRosterStatus = async function() {
+    const status = await fetchRosterStatus();
+    console.log('📋 Roster Status:', status);
+    return status;
+};
 
 // Prop category definitions
 const PROP_CATEGORIES = {
@@ -449,6 +582,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Start auto-refresh for live games
     startAutoRefresh();
+
+    // Initialize roster sync monitor (auto-refreshes props when rosters update)
+    initRosterSyncMonitor();
 
     // Log data sources
     if (window.LiveDataService) {
