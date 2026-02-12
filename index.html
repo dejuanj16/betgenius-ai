@@ -573,6 +573,18 @@
                 updateDataSource('Demo Mode (All Teams)', '#fbbf24');
             }
 
+            // Apply game filter if selected
+            if (selectedGameFilter && selectedGameFilter.teams) {
+                const filterTeams = selectedGameFilter.teams.map(t => t.toUpperCase());
+                const beforeCount = allProps.length;
+                allProps = allProps.filter(prop => {
+                    const propTeam = (prop.team || '').toUpperCase();
+                    return filterTeams.includes(propTeam);
+                });
+                console.log(`🎯 Filtered: ${beforeCount} → ${allProps.length} props for ${selectedGameFilter.matchup}`);
+                updateDataSource(`Filtered: ${selectedGameFilter.matchup}`, '#00ff88');
+            }
+
             // Organize by tier
             const tiers = { topPicks: [], goodValue: [], leans: [], risky: [] };
             allProps.forEach(prop => {
@@ -598,21 +610,20 @@
                     scheduleGamesGrid.innerHTML = renderGamesGrid(scheduleInfo, currentSport);
                     if (scheduleSpinner) scheduleSpinner.style.display = 'none';
                 } else {
-                    // Try to get schedule directly if not available
+                    // Fallback: Fetch directly from ESPN API
                     try {
-                        if (window.EnhancedPropsService) {
-                            const sched = await window.EnhancedPropsService.getTodaysSchedule();
-                            if (sched && Object.keys(sched).length > 0) {
-                                scheduleGamesGrid.innerHTML = renderGamesGrid(sched, currentSport);
-                                if (scheduleSpinner) scheduleSpinner.style.display = 'none';
-                            } else {
-                                scheduleGamesGrid.innerHTML = '<div style="color: #888; padding: 0.5rem;">No games found for today</div>';
-                                if (scheduleSpinner) scheduleSpinner.style.display = 'none';
-                            }
+                        console.log('📅 Fetching schedule directly from ESPN...');
+                        const scheduleData = await fetchESPNScheduleDirect();
+                        if (scheduleData && Object.keys(scheduleData).length > 0) {
+                            scheduleGamesGrid.innerHTML = renderGamesGrid(scheduleData, currentSport);
+                            if (scheduleSpinner) scheduleSpinner.style.display = 'none';
+                        } else {
+                            scheduleGamesGrid.innerHTML = '<div style="color: #888; padding: 0.5rem;">No games found for today</div>';
+                            if (scheduleSpinner) scheduleSpinner.style.display = 'none';
                         }
                     } catch(e) {
                         console.warn('Could not fetch schedule:', e);
-                        scheduleGamesGrid.innerHTML = '<div style="color: #ff4444; padding: 0.5rem;">Failed to load schedule</div>';
+                        scheduleGamesGrid.innerHTML = '<div style="color: #ff4444; padding: 0.5rem;">Failed to load schedule: ' + e.message + '</div>';
                         if (scheduleSpinner) scheduleSpinner.style.display = 'none';
                     }
                 }
@@ -642,6 +653,59 @@
         }
 
         // Renders just the games grid content (no wrapper - used with static container)
+        // Direct ESPN API fetch (fallback when liveOdds.js hasn't loaded)
+        async function fetchESPNScheduleDirect() {
+            const espnBase = 'https://site.api.espn.com/apis/site/v2/sports';
+            const sports = {
+                nba: 'basketball/nba',
+                nhl: 'hockey/nhl',
+                ncaab: 'basketball/mens-college-basketball'
+            };
+
+            const schedule = {};
+
+            for (const [sport, path] of Object.entries(sports)) {
+                try {
+                    const response = await fetch(`${espnBase}/${path}/scoreboard`);
+                    if (!response.ok) continue;
+
+                    const data = await response.json();
+                    const events = data.events || [];
+
+                    schedule[sport] = {
+                        gameCount: events.length,
+                        teams: [],
+                        games: events.map(e => ({
+                            matchup: e.shortName || e.name,
+                            time: e.date,
+                            status: e.status?.type?.name || 'scheduled'
+                        }))
+                    };
+
+                    // Extract teams
+                    events.forEach(e => {
+                        const comp = e.competitions?.[0];
+                        if (comp?.competitors) {
+                            comp.competitors.forEach(c => {
+                                if (c.team?.abbreviation) {
+                                    schedule[sport].teams.push(c.team.abbreviation);
+                                }
+                            });
+                        }
+                    });
+
+                    console.log(`📅 ${sport.toUpperCase()}: ${events.length} games`);
+                } catch (err) {
+                    console.warn(`Failed to fetch ${sport}:`, err.message);
+                }
+            }
+
+            return schedule;
+        }
+
+        // Track currently selected game for filtering
+        let selectedGameFilter = null;
+
         function renderGamesGrid(scheduleInfo, sport) {
             let html = '';
             const sportsToShow = sport === 'all' ? Object.keys(scheduleInfo) : [sport];
@@ -649,23 +713,49 @@
 
             console.log('📅 Rendering games grid, schedule info:', scheduleInfo);
 
+            // Add "Show All" button if a game is selected
+            if (selectedGameFilter) {
+                html += `
+                    <div class="game-card show-all" onclick="clearGameFilter()" style="background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%); border: 2px solid #fff; border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; cursor: pointer; align-items: center; justify-content: center;">
+                        <span style="color: #1a1a2e; font-weight: 700; font-size: 0.9rem;"><i class="fas fa-times"></i> SHOW ALL</span>
+                        <span style="color: #1a1a2e; font-size: 0.75rem;">Clear filter</span>
+                    </div>`;
+            }
+
             sportsToShow.forEach(s => {
                 const info = scheduleInfo[s];
                 if (!info || info.gameCount === 0) return;
 
                 totalGames += info.gameCount;
 
-                info.games.forEach(game => {
+                info.games.forEach((game, idx) => {
                     const gameTime = new Date(game.time);
                     const timeStr = gameTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
                     const statusClass = game.status === 'in_progress' || game.status === 'STATUS_IN_PROGRESS' ? 'live' :
                                        game.status === 'final' || game.status === 'STATUS_FINAL' ? 'final' : 'scheduled';
 
+                    // Parse teams from matchup (e.g., "MIL @ OKC")
+                    const teams = game.matchup.split(' @ ').map(t => t.trim());
+                    const teamsJson = JSON.stringify(teams);
+
+                    // Check if this game is selected
+                    const isSelected = selectedGameFilter &&
+                        selectedGameFilter.matchup === game.matchup &&
+                        selectedGameFilter.sport === s;
+
                     html += `
-                        <div class="game-card ${statusClass}" style="background: linear-gradient(135deg, #16213e 0%, #0f3460 100%); border: 1px solid #00ff88; border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem;">
-                            <span class="game-sport" style="color: #888; font-size: 0.7rem; text-transform: uppercase;">${s.toUpperCase()}</span>
-                            <span class="game-matchup" style="color: #fff; font-weight: 600; font-size: 0.85rem;">${game.matchup}</span>
-                            <span class="game-time" style="color: ${statusClass === 'live' ? '#ff4444' : statusClass === 'final' ? '#888' : '#00ff88'}; font-size: 0.8rem;">${statusClass === 'live' ? '🔴 LIVE' : statusClass === 'final' ? '✓ Final' : '🕐 ' + timeStr}</span>
+                        <div class="game-card ${statusClass} ${isSelected ? 'selected' : ''}"
+                             onclick="filterByGame('${s}', ${teamsJson.replace(/'/g, "\\'")},'${game.matchup.replace(/'/g, "\\'")}')"
+                             style="background: ${isSelected ? 'linear-gradient(135deg, #00ff88 0%, #00cc6a 100%)' : 'linear-gradient(135deg, #16213e 0%, #0f3460 100%)'};
+                                    border: ${isSelected ? '2px solid #fff' : '1px solid #00ff88'};
+                                    border-radius: 8px; padding: 0.75rem;
+                                    display: flex; flex-direction: column; gap: 0.25rem;
+                                    cursor: pointer; transition: all 0.2s ease;">
+                            <span class="game-sport" style="color: ${isSelected ? '#1a1a2e' : '#888'}; font-size: 0.7rem; text-transform: uppercase;">${s.toUpperCase()}</span>
+                            <span class="game-matchup" style="color: ${isSelected ? '#1a1a2e' : '#fff'}; font-weight: 600; font-size: 0.85rem;">${game.matchup}</span>
+                            <span class="game-time" style="color: ${isSelected ? '#1a1a2e' : (statusClass === 'live' ? '#ff4444' : statusClass === 'final' ? '#888' : '#00ff88')}; font-size: 0.8rem;">
+                                ${statusClass === 'live' ? '🔴 LIVE' : statusClass === 'final' ? '✓ Final' : '🕐 ' + timeStr}
+                            </span>
                         </div>`;
                 });
             });
@@ -677,6 +767,30 @@
             console.log('📅 Total games rendered:', totalGames);
             return html;
         }
+
+        // Filter props by specific game
+        function filterByGame(sport, teams, matchup) {
+            console.log(`🎯 Filtering props for: ${matchup} (${sport.toUpperCase()})`, teams);
+
+            selectedGameFilter = { sport, teams, matchup };
+
+            // Re-render with filter applied
+            renderAllProps();
+
+            // Scroll to props section
+            document.getElementById('playerProps')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // Clear game filter
+        function clearGameFilter() {
+            console.log('🔄 Clearing game filter');
+            selectedGameFilter = null;
+            renderAllProps();
+        }
+
+        // Make functions globally accessible
+        window.filterByGame = filterByGame;
+        window.clearGameFilter = clearGameFilter;
 
         function renderTodaysGames(scheduleInfo, sport) {
             let html = '<div class="todays-games-section" style="background: #1a1a2e; border: 2px solid #00ff88; padding: 1rem; margin-bottom: 1.5rem; border-radius: 12px;">';
