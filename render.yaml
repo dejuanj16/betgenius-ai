@@ -1,0 +1,13 @@
+# Render.com Configuration
+# For deploying Node.js server
+
+services:
+  - type: web
+    name: betgenius-ai
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
