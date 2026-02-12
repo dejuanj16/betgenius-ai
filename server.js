@@ -2263,6 +2263,33 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // Route: /api/debug/nhl - Debug NHL stats fetching
+        if (path === '/api/debug/nhl') {
+            console.log('🔍 Debug: Testing NHL stats fetch...');
+            try {
+                const nhlStats = await fetchNHLPlayerStats();
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    skaterCount: nhlStats.skaterLeaders?.length || 0,
+                    goalieCount: nhlStats.goalieLeaders?.length || 0,
+                    source: nhlStats.source,
+                    timestamp: nhlStats.timestamp,
+                    sampleSkaters: (nhlStats.skaterLeaders || []).slice(0, 3),
+                    sampleGoalies: (nhlStats.goalieLeaders || []).slice(0, 2),
+                    error: nhlStats.error || null
+                }));
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: false,
+                    error: e.message,
+                    stack: e.stack
+                }));
+            }
+            return;
+        }
+
 // Route: /api/props/:sport
         if (path.startsWith('/api/props/')) {
             const sport = path.split('/')[3]?.toLowerCase();
