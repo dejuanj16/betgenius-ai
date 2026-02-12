@@ -169,14 +169,14 @@ class LiveDataService {
                 if (!response.ok) continue;
 
                 const data = await response.json();
-                
+
                 // Handle both array format and object format with .props property
                 let propsArray = data;
                 if (data && data.props && Array.isArray(data.props)) {
                     // New format: {source, propsCount, props: [...]}
                     propsArray = data.props;
                 }
-                
+
                 if (propsArray && Array.isArray(propsArray)) {
                     propsArray.forEach(prop => {
                         // Handle both direct prop objects and eventData format

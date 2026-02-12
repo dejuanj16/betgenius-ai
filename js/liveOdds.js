@@ -278,11 +278,35 @@ class EnhancedPropsService {
             await this.initialize();
         }
 
-        // Get demo props
-        const allProps = window.getDemoProps ? window.getDemoProps(sport) : [];
+        // Fetch LIVE props from the API
+        let allProps = [];
+        
+        try {
+            // Use relative URL for production, localhost for dev
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const baseUrl = isLocalhost ? 'http://localhost:3001' : '';
+            
+            const sportToFetch = sport === 'all' ? 'nba' : sport;
+            const response = await fetch(`${baseUrl}/api/props/${sportToFetch}`);
+            
+            if (response.ok) {
+                const data = await response.json();
+                // Handle both array format and object format with .props property
+                if (data && data.props && Array.isArray(data.props)) {
+                    allProps = data.props;
+                    console.log(`📊 Fetched ${data.propsCount || allProps.length} live props from ${data.source || 'API'}`);
+                } else if (Array.isArray(data)) {
+                    allProps = data;
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ Could not fetch live props:', e.message);
+        }
 
         // Filter to only show players playing TODAY
-        const todaysProps = this.liveOddsFetcher.filterPropsForToday(allProps, sport);
+        const todaysProps = allProps.length > 0 
+            ? this.liveOddsFetcher.filterPropsForToday(allProps, sport)
+            : allProps;
 
         console.log(`📊 Showing ${todaysProps.length} of ${allProps.length} props for today's games`);
 

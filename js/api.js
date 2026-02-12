@@ -720,7 +720,7 @@ class SportsAPIService {
                 propsArray = propsData.props;
                 console.log(`📊 Received ${propsData.propsCount || propsArray.length} props from ${propsData.source || 'server'}`);
             }
-            
+
             if (propsArray && Array.isArray(propsArray)) {
                 // Check if array is empty (could be rate limit or no data)
                 if (propsArray.length === 0) {
