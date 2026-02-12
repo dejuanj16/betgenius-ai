@@ -239,7 +239,7 @@ const RECENT_PLAYER_MOVES = {
 
     // WASHINGTON WIZARDS - Trae Young & Anthony Davis trades
     'Trae Young': { team: 'WAS', fullTeam: 'Washington Wizards', position: 'PG', sport: 'nba', injured: true },
-    'Anthony Davis': { team: 'WAS', fullTeam: 'Washington Wizards', position: 'PF', sport: 'nba' },
+    'Anthony Davis': { team: 'WAS', fullTeam: 'Washington Wizards', position: 'PF', sport: 'nba', injured: true },
 
     // PORTLAND TRAIL BLAZERS - Damian Lillard (returned, currently injured)
     'Damian Lillard': { team: 'POR', fullTeam: 'Portland Trail Blazers', position: 'PG', sport: 'nba', injured: true },
@@ -251,8 +251,8 @@ const RECENT_PLAYER_MOVES = {
     'Ivica Zubac': { team: 'IND', fullTeam: 'Indiana Pacers', position: 'C', sport: 'nba' },
     'Tyrese Haliburton': { team: 'IND', fullTeam: 'Indiana Pacers', position: 'PG', sport: 'nba', injured: true },
 
-    // LA LAKERS - Luka Doncic trade (from Dallas)
-    'Luka Doncic': { team: 'LAL', fullTeam: 'Los Angeles Lakers', position: 'PG', sport: 'nba' },
+    // LA LAKERS - Luka Doncic trade (from Dallas) - currently injured
+    'Luka Doncic': { team: 'LAL', fullTeam: 'Los Angeles Lakers', position: 'PG', sport: 'nba', injured: true },
 
     // SAN ANTONIO SPURS - De'Aaron Fox trade (from Sacramento)
     'De\'Aaron Fox': { team: 'SAS', fullTeam: 'San Antonio Spurs', position: 'PG', sport: 'nba' },
