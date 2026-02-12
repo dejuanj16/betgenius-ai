@@ -256,6 +256,313 @@ window.getRosterStatus = async function() {
     return status;
 };
 
+// =====================================================
+// INJURY STATUS ALERTS
+// Shows alerts when injured players are detected in props
+// =====================================================
+
+let lastKnownInjuries = new Set();
+let injuryAlertContainer = null;
+
+// Initialize injury alert system
+function initInjuryAlerts() {
+    console.log('🏥 Initializing injury alert system...');
+
+    // Create alert container if it doesn't exist
+    createInjuryAlertContainer();
+}
+
+// Create the injury alert container in the DOM
+function createInjuryAlertContainer() {
+    if (document.getElementById('injuryAlertContainer')) return;
+
+    const container = document.createElement('div');
+    container.id = 'injuryAlertContainer';
+    container.className = 'injury-alert-container';
+    container.innerHTML = `
+        <div class="injury-alert-header">
+            <span><i class="fas fa-user-injured"></i> Injury Alerts</span>
+            <button class="injury-alert-close" onclick="hideInjuryAlerts()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="injuryAlertList" class="injury-alert-list"></div>
+    `;
+    container.style.display = 'none';
+    document.body.appendChild(container);
+    injuryAlertContainer = container;
+
+    // Add styles if not already present
+    addInjuryAlertStyles();
+}
+
+// Add CSS styles for injury alerts
+function addInjuryAlertStyles() {
+    if (document.getElementById('injuryAlertStyles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'injuryAlertStyles';
+    style.textContent = `
+        .injury-alert-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            width: 320px;
+            max-height: 400px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 1px solid #ff6b6b;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(255, 107, 107, 0.3);
+            z-index: 10000;
+            overflow: hidden;
+            animation: slideInRight 0.3s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .injury-alert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: linear-gradient(90deg, #ff6b6b 0%, #ee5a5a 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .injury-alert-header i {
+            margin-right: 8px;
+        }
+
+        .injury-alert-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .injury-alert-close:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .injury-alert-list {
+            max-height: 320px;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .injury-alert-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            margin: 4px 0;
+            background: rgba(255, 107, 107, 0.1);
+            border-radius: 8px;
+            border-left: 3px solid #ff6b6b;
+        }
+
+        .injury-alert-item.new {
+            animation: pulseAlert 1s ease-in-out;
+        }
+
+        @keyframes pulseAlert {
+            0%, 100% { background: rgba(255, 107, 107, 0.1); }
+            50% { background: rgba(255, 107, 107, 0.3); }
+        }
+
+        .injury-player-info {
+            flex: 1;
+        }
+
+        .injury-player-name {
+            font-weight: 600;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .injury-player-details {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 2px;
+        }
+
+        .injury-status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .injury-status-badge.out { background: #ff4757; color: white; }
+        .injury-status-badge.doubtful { background: #ff6b6b; color: white; }
+        .injury-status-badge.questionable { background: #ffa502; color: #000; }
+        .injury-status-badge.day-to-day { background: #ffdd59; color: #000; }
+        .injury-status-badge.injured { background: #ff4757; color: white; }
+
+        .injury-alert-summary {
+            padding: 8px 12px;
+            background: rgba(255, 107, 107, 0.15);
+            border-top: 1px solid rgba(255, 107, 107, 0.3);
+            font-size: 12px;
+            color: #ff6b6b;
+            text-align: center;
+        }
+
+        @media (max-width: 480px) {
+            .injury-alert-container {
+                width: calc(100% - 20px);
+                right: 10px;
+                left: 10px;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// Check for injured players in props data
+async function checkInjuryStatus(props) {
+    if (!props || props.length === 0) return;
+
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const baseUrl = isLocalhost ? 'http://localhost:3001' : '';
+
+    const injuredPlayers = [];
+    const checkedPlayers = new Set();
+
+    // Check each unique player
+    for (const prop of props) {
+        const playerName = prop.player;
+        if (!playerName || checkedPlayers.has(playerName)) continue;
+        checkedPlayers.add(playerName);
+
+        try {
+            const response = await fetch(`${baseUrl}/api/rosters/player/${encodeURIComponent(playerName)}`, {
+                signal: AbortSignal.timeout(2000)
+            });
+
+            if (response.ok) {
+                const playerData = await response.json();
+                if (playerData.injured || playerData.status === 'out' || playerData.status === 'doubtful') {
+                    injuredPlayers.push({
+                        name: playerName,
+                        team: playerData.team,
+                        status: playerData.status || 'injured',
+                        position: playerData.position
+                    });
+                }
+            }
+        } catch (e) {
+            // Silent fail for individual player checks
+        }
+
+        // Limit to checking first 30 players to avoid too many requests
+        if (checkedPlayers.size >= 30) break;
+    }
+
+    // Show alerts for new injuries
+    if (injuredPlayers.length > 0) {
+        displayInjuryAlerts(injuredPlayers);
+    }
+
+    return injuredPlayers;
+}
+
+// Display injury alerts in the UI
+function displayInjuryAlerts(injuredPlayers) {
+    createInjuryAlertContainer();
+
+    const container = document.getElementById('injuryAlertContainer');
+    const list = document.getElementById('injuryAlertList');
+    if (!container || !list) return;
+
+    // Find new injuries
+    const newInjuries = injuredPlayers.filter(p => !lastKnownInjuries.has(p.name));
+
+    // Update known injuries
+    injuredPlayers.forEach(p => lastKnownInjuries.add(p.name));
+
+    // Build alert list HTML
+    list.innerHTML = injuredPlayers.map(player => {
+        const isNew = newInjuries.some(n => n.name === player.name);
+        const statusClass = player.status.toLowerCase().replace(/[^a-z]/g, '-');
+
+        return `
+            <div class="injury-alert-item ${isNew ? 'new' : ''}">
+                <div class="injury-player-info">
+                    <div class="injury-player-name">${player.name}</div>
+                    <div class="injury-player-details">${player.team} • ${player.position || 'N/A'}</div>
+                </div>
+                <span class="injury-status-badge ${statusClass}">${player.status}</span>
+            </div>
+        `;
+    }).join('');
+
+    // Add summary
+    if (injuredPlayers.length > 0) {
+        list.innerHTML += `
+            <div class="injury-alert-summary">
+                <i class="fas fa-exclamation-triangle"></i>
+                ${injuredPlayers.length} player(s) with injury status - verify before betting
+            </div>
+        `;
+    }
+
+    // Show container
+    container.style.display = 'block';
+
+    // Show toast for new injuries
+    if (newInjuries.length > 0 && window.ToastManager) {
+        window.ToastManager.warning(
+            'Injury Alert',
+            `${newInjuries.length} injured player(s) detected: ${newInjuries.slice(0, 3).map(p => p.name).join(', ')}${newInjuries.length > 3 ? '...' : ''}`,
+            5000
+        );
+    }
+
+    // Track in analytics
+    if (window.BetGeniusAnalytics && newInjuries.length > 0) {
+        window.BetGeniusAnalytics.trackEvent('injury_alert_shown', {
+            count: newInjuries.length,
+            players: newInjuries.map(p => p.name).join(', ')
+        });
+    }
+
+    console.log(`🏥 Injury alerts: ${injuredPlayers.length} players (${newInjuries.length} new)`);
+}
+
+// Hide injury alerts
+window.hideInjuryAlerts = function() {
+    const container = document.getElementById('injuryAlertContainer');
+    if (container) {
+        container.style.display = 'none';
+    }
+};
+
+// Show injury alerts
+window.showInjuryAlerts = function() {
+    const container = document.getElementById('injuryAlertContainer');
+    if (container) {
+        container.style.display = 'block';
+    }
+};
+
+// Manual check for injuries (can be called from console)
+window.checkInjuries = async function() {
+    console.log('🏥 Checking for injured players...');
+    const props = state.props || [];
+    const injuries = await checkInjuryStatus(props);
+    console.log('🏥 Injured players:', injuries);
+    return injuries;
+};
+
 // Prop category definitions
 const PROP_CATEGORIES = {
     all: { label: 'All', icon: 'fa-list', keywords: [] },

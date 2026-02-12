@@ -688,14 +688,15 @@ async function updateRosterCache(sport) {
     }
 }
 
-// Get player's current team from cache
+// Get player's current team from cache (uses live ESPN roster with priority overrides)
 function getPlayerTeam(playerName, sport) {
-    // Check manual overrides first
-    if (RECENT_PLAYER_MOVES[playerName]) {
-        return RECENT_PLAYER_MOVES[playerName];
+    // Use the unified live roster lookup function
+    const liveRoster = getPlayerFromLiveRoster(playerName, sport);
+    if (liveRoster) {
+        return liveRoster;
     }
 
-    // Check roster cache
+    // Check legacy roster cache as fallback
     const cache = ROSTER_CACHE[sport];
     if (cache?.players?.has(playerName)) {
         return cache.players.get(playerName);
@@ -4958,13 +4959,13 @@ function generatePropsFromRealStats(stats, sport, gameContext = {}) {
 
     if (sport === 'nba' && stats.players) {
         for (const player of stats.players.slice(0, 100)) {
-            // Apply roster override for recently traded players
-            const rosterOverride = RECENT_PLAYER_MOVES[player.player];
-            const playerTeam = rosterOverride?.team || player.team;
-            const fullTeam = rosterOverride?.fullTeam || null;
-            const isInjured = rosterOverride?.injured || false;
+            // Use live roster data (synced from ESPN) with injury/manual override priority
+            const liveRosterData = getPlayerFromLiveRoster(player.player, 'nba');
+            const playerTeam = liveRosterData?.team || player.team;
+            const fullTeam = liveRosterData?.fullTeam || null;
+            const isInjured = liveRosterData?.injured || false;
 
-            // Skip injured players from priority roster
+            // Skip injured players
             if (isInjured) {
                 continue;
             }
@@ -9533,14 +9534,14 @@ async function fetchPlayerStats(sport) {
                     if (player.displayName || player.fullName) {
                         const playerName = player.displayName || player.fullName;
 
-                        // Check for roster override from RECENT_PLAYER_MOVES
-                        const override = RECENT_PLAYER_MOVES[playerName];
-                        const playerTeam = override?.team || team.abbreviation;
-                        const playerTeamName = override?.fullTeam || team.displayName;
-                        const playerPosition = override?.position || player.position?.abbreviation || player.position?.name;
+                        // Use live roster data (synced from ESPN) with priority overrides
+                        const liveRoster = getPlayerFromLiveRoster(playerName, sport);
+                        const playerTeam = liveRoster?.team || team.abbreviation;
+                        const playerTeamName = liveRoster?.fullTeam || team.displayName;
+                        const playerPosition = liveRoster?.position || player.position?.abbreviation || player.position?.name;
 
                         // Generate team logo URL based on actual team
-                        const teamLogoUrl = override
+                        const teamLogoUrl = liveRoster
                             ? `https://a.espncdn.com/i/teamlogos/${sport}/500/${playerTeam?.toLowerCase()}.png`
                             : team.logos?.[0]?.href || `https://a.espncdn.com/i/teamlogos/${sport}/500/${team.abbreviation?.toLowerCase()}.png`;
 
@@ -9551,7 +9552,7 @@ async function fetchPlayerStats(sport) {
                             lastName: player.lastName,
                             position: playerPosition,
                             team: playerTeam,
-                            teamId: override ? null : team.id,
+                            teamId: liveRoster ? null : team.id,
                             teamName: playerTeamName,
                             teamLogo: teamLogoUrl,
                             jersey: player.jersey,
