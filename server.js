@@ -2996,7 +2996,9 @@ async function fetchPlayerProps(sport) {
 async function fetchESPNScores(sport) {
     const sportPaths = {
         'nba': 'basketball/nba',
+        'ncaab': 'basketball/mens-college-basketball',
         'nfl': 'football/nfl',
+        'ncaaf': 'football/college-football',
         'nhl': 'hockey/nhl',
         'mlb': 'baseball/mlb'
     };
@@ -9318,7 +9320,14 @@ async function getGeneratedProps(sport) {
     let injuries = [];
     try {
         // Fetch today's games from ESPN
-        const sportPaths = { nba: 'basketball/nba', nfl: 'football/nfl', nhl: 'hockey/nhl', mlb: 'baseball/mlb' };
+        const sportPaths = { 
+            nba: 'basketball/nba', 
+            ncaab: 'basketball/mens-college-basketball',
+            nfl: 'football/nfl', 
+            ncaaf: 'football/college-football',
+            nhl: 'hockey/nhl', 
+            mlb: 'baseball/mlb' 
+        };
         const sportPath = sportPaths[sport];
         if (sportPath) {
             const scoresUrl = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/scoreboard`;
@@ -9499,12 +9508,29 @@ function getEstimatedStats(sport, position) {
             'PF': { points: 11, rebounds: 7, assists: 2, threes: 1 },
             'default': { points: 12, rebounds: 5, assists: 3, threes: 1.5 }
         },
+        ncaab: {
+            'G': { points: 12, rebounds: 2.5, assists: 4, threes: 1.5 },
+            'F': { points: 10, rebounds: 5, assists: 2, threes: 1 },
+            'C': { points: 8, rebounds: 6, assists: 1.5, threes: 0.3 },
+            'PG': { points: 11, rebounds: 2, assists: 5, threes: 1.5 },
+            'SG': { points: 13, rebounds: 2.5, assists: 3, threes: 2 },
+            'SF': { points: 10, rebounds: 4, assists: 2, threes: 1 },
+            'PF': { points: 9, rebounds: 5.5, assists: 1.5, threes: 0.5 },
+            'default': { points: 10, rebounds: 4, assists: 2.5, threes: 1 }
+        },
         nfl: {
             'QB': { passYds: 250, rushYds: 15, receptions: 0 },
             'RB': { passYds: 0, rushYds: 65, receptions: 3 },
             'WR': { passYds: 0, rushYds: 0, recYds: 55, receptions: 4 },
             'TE': { passYds: 0, rushYds: 0, recYds: 35, receptions: 3 },
             'default': { passYds: 0, rushYds: 30, receptions: 2 }
+        },
+        ncaaf: {
+            'QB': { passYds: 220, rushYds: 25, receptions: 0 },
+            'RB': { passYds: 0, rushYds: 75, receptions: 2 },
+            'WR': { passYds: 0, rushYds: 0, recYds: 50, receptions: 4 },
+            'TE': { passYds: 0, rushYds: 0, recYds: 30, receptions: 2 },
+            'default': { passYds: 0, rushYds: 35, receptions: 2 }
         },
         nhl: {
             'C': { goals: 0.3, assists: 0.4, shots: 3 },
@@ -9556,9 +9582,20 @@ async function generatePropsFromRoster(sport) {
                 { type: 'Assists', stat: 'assists', variance: 2 },
                 { type: 'Threes Made', stat: 'threes', variance: 1.5 }
             ],
+            ncaab: [
+                { type: 'Points', stat: 'points', variance: 3 },
+                { type: 'Rebounds', stat: 'rebounds', variance: 2 },
+                { type: 'Assists', stat: 'assists', variance: 1.5 },
+                { type: 'Threes Made', stat: 'threes', variance: 1 }
+            ],
             nfl: [
                 { type: 'Passing Yards', stat: 'passYds', variance: 30 },
                 { type: 'Rushing Yards', stat: 'rushYds', variance: 15 },
+                { type: 'Receptions', stat: 'receptions', variance: 2 }
+            ],
+            ncaaf: [
+                { type: 'Passing Yards', stat: 'passYds', variance: 35 },
+                { type: 'Rushing Yards', stat: 'rushYds', variance: 20 },
                 { type: 'Receptions', stat: 'receptions', variance: 2 }
             ],
             nhl: [
