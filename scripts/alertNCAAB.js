@@ -43,6 +43,9 @@ const CONFIG = {
     // PrizePicks CBB league ID
     prizePicksCBBUrl: 'https://api.prizepicks.com/projections?league_id=7',
 
+    // Underdog Fantasy API (backup source - no rate limiting)
+    underdogApiUrl: 'https://api.underdogfantasy.com/beta/v3/over_under_lines',
+
     // State file to track if we've already alerted
     stateFile: '/tmp/ncaab_props_alerted.txt'
 };
@@ -254,7 +257,7 @@ async function checkPrizePicks() {
         const projections = data.data || [];
 
         if (projections.length === 0) {
-            return { available: false, count: 0, props: [] };
+            return { available: false, count: 0, props: [], source: 'prizepicks' };
         }
 
         const props = projections.slice(0, 10).map(p => {
@@ -267,9 +270,68 @@ async function checkPrizePicks() {
             };
         });
 
-        return { available: true, count: projections.length, props };
+        return { available: true, count: projections.length, props, source: 'prizepicks' };
     } catch (e) {
-        return { available: false, error: e.message, count: 0, props: [] };
+        return { available: false, error: e.message, count: 0, props: [], source: 'prizepicks' };
+    }
+}
+
+// =====================================================
+// UNDERDOG FANTASY CHECK (Backup source - no rate limiting)
+// =====================================================
+
+async function checkUnderdogFantasy() {
+    try {
+        const data = await fetchJSON(CONFIG.underdogApiUrl);
+        const games = data.games || [];
+        const lines = data.over_under_lines || [];
+        const players = data.players || [];
+        const appearances = data.appearances || [];
+
+        // Filter CBB games
+        const cbbGames = games.filter(g => g.sport_id === 'CBB');
+        const cbbGameIds = new Set(cbbGames.map(g => g.id));
+
+        // Build lookups
+        const playerLookup = {};
+        players.forEach(p => {
+            playerLookup[p.id] = {
+                name: `${p.first_name} ${p.last_name}`,
+                team: p.team_abbrev || ''
+            };
+        });
+
+        const appearanceLookup = {};
+        appearances.forEach(a => {
+            appearanceLookup[a.id] = a;
+        });
+
+        // Count and collect CBB props
+        const cbbProps = [];
+        for (const line of lines) {
+            const ou = line.over_under;
+            if (!ou || ou.category !== 'player_prop') continue;
+            const statInfo = ou.appearance_stat;
+            if (!statInfo) continue;
+            const app = appearanceLookup[statInfo.appearance_id];
+            if (!app || !cbbGameIds.has(app.match_id)) continue;
+            const player = playerLookup[app.player_id];
+            if (!player) continue;
+            cbbProps.push({
+                player: player.name,
+                team: player.team,
+                line: line.stat_value,
+                stat: statInfo.display_stat || statInfo.stat
+            });
+        }
+
+        if (cbbProps.length === 0) {
+            return { available: false, count: 0, props: [], source: 'underdog' };
+        }
+
+        return { available: true, count: cbbProps.length, props: cbbProps.slice(0, 10), source: 'underdog' };
+    } catch (e) {
+        return { available: false, error: e.message, count: 0, props: [], source: 'underdog' };
     }
 }
 
@@ -340,23 +402,37 @@ async function runCheck() {
     log('🏀 NCAAB PROPS ALERT CHECK', COLORS.bold + COLORS.cyan);
     console.log('═'.repeat(60) + '\n');
 
-    // Check PrizePicks
+    // Check PrizePicks first
     log('Checking PrizePicks CBB...', COLORS.blue);
-    const pp = await checkPrizePicks();
+    let pp = await checkPrizePicks();
 
-    if (pp.error) {
-        log(`❌ Error: ${pp.error}`, COLORS.red);
+    // If PrizePicks failed or has no props, try Underdog Fantasy
+    if (!pp.available || pp.error) {
+        log('Checking Underdog Fantasy CBB (backup)...', COLORS.blue);
+        const ud = await checkUnderdogFantasy();
+
+        if (ud.available) {
+            pp = ud; // Use Underdog data instead
+            log(`🐕 Underdog Fantasy: ${ud.count} CBB props available!`, COLORS.green);
+        } else if (ud.error) {
+            log(`⚠️ Underdog error: ${ud.error}`, COLORS.yellow);
+        }
+    }
+
+    if (pp.error && !pp.available) {
+        log(`❌ No props sources available`, COLORS.red);
         return { alerted: false };
     }
 
     if (!pp.available) {
-        log('⏳ No CBB props yet', COLORS.yellow);
+        log('⏳ No CBB props yet from any source', COLORS.yellow);
         console.log('   Props typically release 1-3 hours before tip-off\n');
         return { alerted: false };
     }
 
     // Props are available!
-    log(`🎉 ${pp.count} CBB PROPS AVAILABLE!`, COLORS.bold + COLORS.green);
+    const sourceLabel = pp.source === 'underdog' ? 'Underdog Fantasy' : 'PrizePicks';
+    log(`🎉 ${pp.count} CBB PROPS AVAILABLE from ${sourceLabel}!`, COLORS.bold + COLORS.green);
 
     console.log(`\n${COLORS.green}Sample props:${COLORS.reset}`);
     pp.props.slice(0, 8).forEach(p => {
