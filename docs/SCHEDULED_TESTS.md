@@ -1,10 +1,46 @@
 # BetGenius AI - Scheduled Tests
 
+## Cron Jobs Overview
+
+All tests are scheduled via cron and will automatically run at the specified times.
+
+### View/Manage Cron Jobs
+
+```bash
+# View all scheduled jobs
+crontab -l
+
+# Remove all BetGenius cron jobs after testing
+crontab -l | grep -v "cron.*Filter\|cronNCAAB" | crontab -
+
+# View logs
+ls -lt ~/Project/sports-betting-ai/logs/*.log | head -5
+```
+
+---
+
 ## NHL Filter Test - February 26, 2026
 
 **Purpose:** Test completed games filtering when NHL resumes from Olympic Break
 
 **Why this date:** NHL is on Olympic Break from Feb 10-25, 2026. Regular season resumes Feb 26.
+
+### Cron Schedule (Auto-installed)
+
+| Time (EST) | Purpose |
+|------------|---------|
+| 12:00 PM | Early check - verify Olympic Break clears |
+| 3:00 PM | Afternoon check |
+| 5:00 PM | Pre-game check |
+| 6:00 PM | Pre-game check |
+| 7:00 PM | Just before tip-off |
+| 7:30 PM | Just before tip-off |
+| 8:00 PM | Games starting |
+| 9:00 PM | During games |
+| 10:00 PM | During games |
+| 11:00 PM | Games completing |
+| 11:30 PM | Post-game filter test |
+| 12:00 AM | Final check |
 
 ### Test Commands
 
@@ -20,6 +56,9 @@ node scripts/testNHLFilter.js --monitor
 
 # Custom interval (every 60 seconds)
 node scripts/testNHLFilter.js --monitor --interval=60
+
+# Manual cron test
+~/Project/sports-betting-ai/scripts/cronNHLFilter.sh
 ```
 
 ### What the test verifies
@@ -55,6 +94,23 @@ node scripts/testNHLFilter.js --monitor --interval=60
 - **Feb 16 (Sun):** All-Star Game
 - **Feb 17 (Mon):** Regular season resumes! ⬅️
 
+### Cron Schedule (Auto-installed)
+
+| Time (EST) | Purpose |
+|------------|---------|
+| 12:00 PM | Early check - verify All-Star clears |
+| 3:00 PM | Afternoon check |
+| 5:00 PM | Pre-game check |
+| 6:00 PM | Pre-game check |
+| 7:00 PM | Just before tip-off |
+| 7:30 PM | Just before tip-off |
+| 8:00 PM | Games starting |
+| 9:00 PM | During games |
+| 10:00 PM | During games |
+| 11:00 PM | Games completing |
+| 11:30 PM | Post-game filter test |
+| 12:00 AM | Final check |
+
 ### Test Commands
 
 ```bash
@@ -69,6 +125,9 @@ node scripts/testNBAFilter.js --monitor
 
 # Custom interval (every 60 seconds)
 node scripts/testNBAFilter.js --monitor --interval=60
+
+# Manual cron test
+~/Project/sports-betting-ai/scripts/cronNBAFilter.sh
 ```
 
 ### What the test verifies
@@ -85,11 +144,63 @@ node scripts/testNBAFilter.js --monitor --interval=60
 
 ---
 
+## Log Files
+
+All cron job outputs are logged to:
+
+```
+/Users/jacdejuandaniel/Project/sports-betting-ai/logs/
+```
+
+### Log File Patterns
+
+| Pattern | Description |
+|---------|-------------|
+| `nba_filter_test_*.log` | NBA filter test results |
+| `nhl_filter_test_*.log` | NHL filter test results |
+| `ncaab_monitor_*.log` | NCAAB props monitoring |
+
+### View Latest Logs
+
+```bash
+# Latest NBA log
+cat $(ls -t ~/Project/sports-betting-ai/logs/nba_*.log | head -1)
+
+# Latest NHL log
+cat $(ls -t ~/Project/sports-betting-ai/logs/nhl_*.log | head -1)
+
+# All logs from today
+ls -la ~/Project/sports-betting-ai/logs/*$(date +%Y%m%d)*.log
+```
+
+---
+
 ## Future Test Schedule
 
-| Date | Sport | Event | Test |
-|------|-------|-------|------|
-| Feb 17, 2026 | NBA | Resume after All-Star | Filter test |
-| Feb 26, 2026 | NHL | Resume from Olympic Break | Filter test |
-| Late March 2026 | MLB | Opening Day | Verify offseason detection clears |
-| September 2026 | NFL | Regular season starts | Full props test |
+| Date | Sport | Event | Script | Cron |
+|------|-------|-------|--------|------|
+| Feb 13, 2026 | NCAAB | Tonight's games | `monitorNCAAB.js` | ✅ Installed |
+| Feb 17, 2026 | NBA | Resume after All-Star | `testNBAFilter.js` | ✅ Installed |
+| Feb 26, 2026 | NHL | Resume from Olympics | `testNHLFilter.js` | ✅ Installed |
+| Late March 2026 | MLB | Opening Day | TBD | ❌ Not yet |
+| September 2026 | NFL | Regular season starts | TBD | ❌ Not yet |
+
+---
+
+## Cleanup After Testing
+
+After each test date, remove the corresponding cron jobs:
+
+```bash
+# Remove NCAAB jobs (after Feb 13)
+crontab -l | grep -v "cronNCAAB" | crontab -
+
+# Remove NBA jobs (after Feb 17)
+crontab -l | grep -v "cronNBAFilter" | crontab -
+
+# Remove NHL jobs (after Feb 26)
+crontab -l | grep -v "cronNHLFilter" | crontab -
+
+# Remove ALL BetGenius cron jobs
+crontab -l | grep -v "/sports-betting-ai/scripts/cron" | crontab -
+```

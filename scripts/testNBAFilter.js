@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
  * NBA Props Monitor & Filter Test - February 17, 2026
- * 
+ *
  * Purpose: Monitor NBA props when regular season resumes after All-Star Weekend
- * 
+ *
  * All-Star Weekend Schedule:
  *   - Feb 14 (Fri): Rising Stars Game
  *   - Feb 15 (Sat): Skills/3PT/Dunk Contest
  *   - Feb 16 (Sun): All-Star Game
  *   - Feb 17 (Mon): Regular season resumes!
- * 
+ *
  * Usage:
  *   node scripts/testNBAFilter.js              # Full test suite
  *   node scripts/testNBAFilter.js --check      # Quick status check
@@ -41,7 +41,7 @@ function log(msg, color = '') {
 function fetchJSON(url) {
     return new Promise((resolve, reject) => {
         const options = {
-            headers: { 
+            headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
             }
         };
@@ -66,12 +66,12 @@ async function getESPNGames() {
         const home = comp.competitors?.find(c => c.homeAway === 'home') || {};
         const away = comp.competitors?.find(c => c.homeAway === 'away') || {};
         const status = event.status?.type?.name || 'UNKNOWN';
-        
+
         // Detect All-Star events
         const name = (event.name || '').toLowerCase();
-        const isAllStar = name.includes('all-star') || name.includes('rising stars') || 
+        const isAllStar = name.includes('all-star') || name.includes('rising stars') ||
                           name.includes('celebrity') || name.includes('team ');
-        
+
         return {
             name: event.name,
             homeTeam: home.team?.abbreviation,
@@ -104,9 +104,9 @@ async function checkPrizePicks() {
     try {
         const data = await fetchJSON(PRIZEPICKS_NBA);
         const projections = data.data || [];
-        
-        return { 
-            available: projections.length > 0, 
+
+        return {
+            available: projections.length > 0,
             count: projections.length
         };
     } catch (e) {
@@ -122,51 +122,51 @@ async function runQuickCheck() {
     // Check ESPN games
     log('Fetching ESPN NBA scoreboard...', COLORS.blue);
     const games = await getESPNGames();
-    
+
     const regularGames = games.filter(g => !g.isAllStar);
     const allStarGames = games.filter(g => g.isAllStar);
     const finalGames = regularGames.filter(g => g.isFinal);
     const inProgressGames = regularGames.filter(g => g.isInProgress);
     const scheduledGames = regularGames.filter(g => !g.isFinal && !g.isInProgress);
-    
+
     console.log(`\n📊 Game Status:`);
     console.log(`   Total Events: ${games.length}`);
-    
+
     if (allStarGames.length > 0) {
         console.log(`   ${COLORS.yellow}⭐ All-Star Events: ${allStarGames.length}${COLORS.reset}`);
         allStarGames.forEach(g => {
             console.log(`      • ${g.name} - ${g.statusDetail}`);
         });
     }
-    
+
     console.log(`   Regular Season Games: ${regularGames.length}`);
     if (regularGames.length > 0) {
         console.log(`   ${COLORS.green}✓ Final: ${finalGames.length}${COLORS.reset}`);
         console.log(`   ${COLORS.yellow}▶ In Progress: ${inProgressGames.length}${COLORS.reset}`);
         console.log(`   ⏳ Scheduled: ${scheduledGames.length}`);
     }
-    
+
     if (finalGames.length > 0) {
         console.log(`\n🏁 Completed Games (should be filtered):`);
         finalGames.forEach(g => {
             console.log(`   ${g.awayTeam} ${g.awayScore} @ ${g.homeTeam} ${g.homeScore} - FINAL`);
         });
     }
-    
+
     // Check API props
     log('\nFetching BetGenius NBA props...', COLORS.blue);
     const propsData = await getNBAProps();
-    
+
     console.log(`\n📈 Props Status:`);
     console.log(`   Source: ${propsData.source}`);
     console.log(`   Props Count: ${propsData.propsCount}`);
-    
+
     if (propsData.specialEvent) {
         console.log(`   ${COLORS.yellow}⚠ Special Event: ${propsData.specialEvent}${COLORS.reset}`);
         console.log(`   Note: ${propsData.note}`);
         return { ready: false, reason: 'All-Star Weekend still active', isAllStar: true };
     }
-    
+
     // Check PrizePicks
     log('\nChecking PrizePicks NBA...', COLORS.blue);
     const pp = await checkPrizePicks();
@@ -175,7 +175,7 @@ async function runQuickCheck() {
     } else {
         console.log(`   ${COLORS.yellow}⏳ No PrizePicks NBA props yet${COLORS.reset}`);
     }
-    
+
     // Check for props from completed teams
     if (finalGames.length > 0 && propsData.props.length > 0) {
         const completedTeams = new Set();
@@ -183,9 +183,9 @@ async function runQuickCheck() {
             completedTeams.add(g.homeTeam);
             completedTeams.add(g.awayTeam);
         });
-        
+
         const propsFromCompleted = propsData.props.filter(p => completedTeams.has(p.team));
-        
+
         console.log(`\n🔍 Filter Test Results:`);
         if (propsFromCompleted.length === 0) {
             log(`✅ PASS: 0 props from completed teams (filtering working!)`, COLORS.green);
@@ -195,17 +195,17 @@ async function runQuickCheck() {
                 console.log(`   - ${p.player} (${p.team}): ${p.line} ${p.prop}`);
             });
         }
-        
-        return { 
-            ready: true, 
+
+        return {
+            ready: true,
             passed: propsFromCompleted.length === 0,
             completedTeams: Array.from(completedTeams),
             propsFromCompleted: propsFromCompleted.length
         };
     }
-    
-    return { 
-        ready: regularGames.length > 0, 
+
+    return {
+        ready: regularGames.length > 0,
         waiting: regularGames.length > 0 && finalGames.length === 0,
         noGames: regularGames.length === 0
     };
@@ -216,19 +216,19 @@ async function runMonitorMode(intervalSec = 120) {
     log('🏀 NBA FILTER TEST - MONITOR MODE', COLORS.bold + COLORS.cyan);
     log(`   Refreshing every ${intervalSec} seconds. Press Ctrl+C to stop.`, COLORS.cyan);
     console.log('═'.repeat(65) + '\n');
-    
+
     let lastFinalCount = 0;
     let wasAllStar = true;
-    
+
     const check = async () => {
         try {
             const games = await getESPNGames();
             const props = await getNBAProps();
-            
+
             const regularGames = games.filter(g => !g.isAllStar);
             const finalGames = regularGames.filter(g => g.isFinal);
             const inProgress = regularGames.filter(g => g.isInProgress);
-            
+
             // Alert when transitioning out of All-Star Weekend
             if (wasAllStar && regularGames.length > 0 && !props.specialEvent) {
                 wasAllStar = false;
@@ -237,7 +237,7 @@ async function runMonitorMode(intervalSec = 120) {
                 console.log('🎉'.repeat(20) + '\n');
                 process.stdout.write('\x07'); // Bell
             }
-            
+
             // Alert on new FINAL games
             if (finalGames.length > lastFinalCount) {
                 log(`🚨 NEW GAME WENT FINAL!`, COLORS.bold + COLORS.yellow);
@@ -247,7 +247,7 @@ async function runMonitorMode(intervalSec = 120) {
                 });
                 lastFinalCount = finalGames.length;
             }
-            
+
             // Status line
             const statusLine = [
                 `Games: ${regularGames.length}`,
@@ -256,9 +256,9 @@ async function runMonitorMode(intervalSec = 120) {
                 `Props: ${props.propsCount}`,
                 `Source: ${props.source}`
             ].join(' | ');
-            
+
             log(statusLine, props.specialEvent ? COLORS.yellow : COLORS.green);
-            
+
             // Check filtering
             if (finalGames.length > 0 && props.props.length > 0) {
                 const completedTeams = new Set();
@@ -266,7 +266,7 @@ async function runMonitorMode(intervalSec = 120) {
                     completedTeams.add(g.homeTeam);
                     completedTeams.add(g.awayTeam);
                 });
-                
+
                 const leaked = props.props.filter(p => completedTeams.has(p.team));
                 if (leaked.length > 0) {
                     log(`❌ FILTER LEAK: ${leaked.length} props from completed teams!`, COLORS.red);
@@ -274,12 +274,12 @@ async function runMonitorMode(intervalSec = 120) {
                     log(`✅ Filter working: 0 props from ${completedTeams.size} completed teams`, COLORS.green);
                 }
             }
-            
+
         } catch (e) {
             log(`Error: ${e.message}`, COLORS.red);
         }
     };
-    
+
     await check();
     setInterval(check, intervalSec * 1000);
 }
@@ -291,17 +291,17 @@ async function runFullTest() {
     console.log('  Scheduled for: February 17, 2026 (Regular season resumes)');
     console.log(`${COLORS.reset}`);
     console.log('═'.repeat(70) + '\n');
-    
+
     console.log(`${COLORS.yellow}All-Star Weekend Schedule:${COLORS.reset}`);
     console.log('  • Feb 14 (Fri): Rising Stars Game');
     console.log('  • Feb 15 (Sat): Skills/3PT/Dunk Contest');
     console.log('  • Feb 16 (Sun): All-Star Game');
     console.log('  • Feb 17 (Mon): Regular season resumes! ⬅️\n');
-    
+
     const today = new Date();
     const targetDate = new Date('2026-02-17');
     const daysUntil = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
-    
+
     if (daysUntil > 0) {
         log(`⏳ ${daysUntil} days until NBA resumes (Feb 17, 2026)`, COLORS.yellow);
         log('Running preliminary check anyway...\n', COLORS.yellow);
@@ -310,13 +310,13 @@ async function runFullTest() {
     } else {
         log(`✅ NBA has been back for ${Math.abs(daysUntil)} days`, COLORS.green);
     }
-    
+
     // Run the check
     const result = await runQuickCheck();
-    
+
     console.log('\n' + '─'.repeat(65));
     console.log('Test Summary:');
-    
+
     if (result.isAllStar) {
         console.log(`  Status: ${COLORS.yellow}Not ready - ${result.reason}${COLORS.reset}`);
         console.log('  Action: Run this test again on Feb 17 or later');
@@ -334,7 +334,7 @@ async function runFullTest() {
         console.log(`  Status: ${COLORS.red}❌ FAILED - Props from completed teams found!${COLORS.reset}`);
         console.log(`  Action: Check filterCompletedGameProps() in server.js`);
     }
-    
+
     console.log('─'.repeat(65) + '\n');
 }
 
