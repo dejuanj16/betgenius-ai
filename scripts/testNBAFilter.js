@@ -20,7 +20,7 @@ const https = require('https');
 
 const API_BASE = 'https://betgenius-ai.onrender.com';
 const ESPN_NBA = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard';
-const PRIZEPICKS_NBA_URL = 'https://api.prizepicks.com/projections?league_id=7';
+const PRIZEPICKS_NBA = 'https://api.prizepicks.com/projections?league_id=7';
 
 const COLORS = {
     reset: '\x1b[0m',
@@ -102,8 +102,7 @@ async function getNBAProps() {
 
 async function checkPrizePicks() {
     try {
-        // NBA league_id is 7 for PrizePicks
-        const data = await fetchJSON('https://api.prizepicks.com/projections?league_id=7');
+        const data = await fetchJSON(PRIZEPICKS_NBA);
         const projections = data.data || [];
         
         return { 
