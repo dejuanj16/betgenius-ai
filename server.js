@@ -946,6 +946,87 @@ const TEAM_ABBR_ALIASES = {
     'BRK': 'BKN'
 };
 
+// Check for special events (All-Star Weekend, Olympic Break, etc.)
+async function checkSpecialEvents(sport) {
+    const sportPaths = {
+        nba: 'basketball/nba',
+        nhl: 'hockey/nhl',
+        ncaab: 'basketball/mens-college-basketball',
+        ncaaf: 'football/college-football',
+        nfl: 'football/nfl',
+        mlb: 'baseball/mlb'
+    };
+    
+    const sportPath = sportPaths[sport];
+    if (!sportPath) return null;
+    
+    try {
+        const url = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/scoreboard`;
+        const data = await fetchJSON(url);
+        
+        if (!data?.events) return null;
+        
+        const today = new Date();
+        
+        // NBA All-Star Weekend Check
+        if (sport === 'nba') {
+            const isAllStarEvent = data.events.some(event => {
+                const name = (event.name || '').toLowerCase();
+                const homeName = event.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home')?.team?.displayName?.toLowerCase() || '';
+                const awayName = event.competitions?.[0]?.competitors?.find(c => c.homeAway === 'away')?.team?.displayName?.toLowerCase() || '';
+                
+                return name.includes('all-star') || name.includes('rising stars') ||
+                       name.includes('celebrity') || name.includes('skills') ||
+                       homeName.includes('team') || awayName.includes('team') ||
+                       homeName.includes('world') || awayName.includes('world');
+            });
+            
+            if (isAllStarEvent) {
+                console.log(`🌟 NBA All-Star Weekend detected`);
+                return {
+                    source: 'nba_allstar_weekend',
+                    propsCount: 0,
+                    props: [],
+                    note: '🌟 NBA All-Star Weekend! Rising Stars (Fri), Skills/3PT/Dunk Contest (Sat), All-Star Game (Sun). Regular season props return next week!',
+                    specialEvent: 'all_star_weekend'
+                };
+            }
+        }
+        
+        // NHL Olympic Break Check
+        if (sport === 'nhl') {
+            // Check if next game is far in the future (Olympic break)
+            const futureGames = data.events.filter(e => {
+                const gameDate = new Date(e.date);
+                return gameDate > today;
+            });
+            
+            if (futureGames.length > 0) {
+                const nextGame = new Date(futureGames[0].date);
+                const daysUntilNextGame = Math.ceil((nextGame - today) / (1000 * 60 * 60 * 24));
+                
+                if (daysUntilNextGame > 5) {
+                    const resumeDate = nextGame.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+                    console.log(`🏒 NHL Olympic Break - Next game in ${daysUntilNextGame} days (${resumeDate})`);
+                    return {
+                        source: 'nhl_olympic_break',
+                        propsCount: 0,
+                        props: [],
+                        note: `🏒 NHL on Olympic Break! Watch Team USA & Team Canada compete in the Winter Olympics. Regular season resumes ${resumeDate}.`,
+                        specialEvent: 'olympic_break',
+                        resumeDate: nextGame.toISOString()
+                    };
+                }
+            }
+        }
+        
+        return null; // No special event
+    } catch (e) {
+        console.log(`⚠️ Special event check error: ${e.message}`);
+        return null;
+    }
+}
+
 function normalizeTeamAbbr(abbr) {
     if (!abbr) return null;
     const upper = abbr.toUpperCase();
@@ -2385,6 +2466,21 @@ const server = http.createServer(async (req, res) => {
         if (path.startsWith('/api/props/')) {
             const sport = path.split('/')[3]?.toLowerCase();
             if (!validateSport(sport)) return;
+
+            // =====================================================
+            // SPECIAL EVENTS CHECK (All-Star, Olympics, etc.)
+            // Check FIRST before any data fetching
+            // =====================================================
+            try {
+                const specialEvent = await checkSpecialEvents(sport);
+                if (specialEvent) {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(specialEvent));
+                    return;
+                }
+            } catch (e) {
+                console.log(`⚠️ Special event check failed: ${e.message}`);
+            }
 
             // Priority: PrizePicks > Live Props (auto-refreshed) > DraftKings > Odds API > Generated
             let data;
