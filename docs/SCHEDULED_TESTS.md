@@ -90,7 +90,7 @@ node scripts/testNHLFilter.js --monitor --interval=60
 
 ### All-Star Weekend Schedule
 - **Feb 14 (Fri):** Rising Stars Game
-- **Feb 15 (Sat):** Skills/3PT/Dunk Contest  
+- **Feb 15 (Sat):** Skills/3PT/Dunk Contest
 - **Feb 16 (Sun):** All-Star Game
 - **Feb 17 (Mon):** Regular season resumes! ⬅️
 
