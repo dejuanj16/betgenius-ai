@@ -1181,6 +1181,24 @@ async function fetchLivePropsFromAllSources(sport) {
         console.log(`  ⚠️ PrizePicks unavailable: ${e.message}`);
     }
 
+    // SOURCE 1B: Underdog Fantasy - Alternative real props source (no rate limiting)
+    try {
+        console.log(`🐕 Fetching Underdog Fantasy for ${sport.toUpperCase()}...`);
+        const underdogResult = await fetchUnderdogFantasyProps(sport);
+        if (underdogResult && underdogResult.props && underdogResult.props.length > 0) {
+            underdogResult.props.forEach(prop => {
+                const key = `${prop.player}-${prop.propType}`;
+                if (!seenProps.has(key)) {
+                    seenProps.add(key);
+                    allProps.push({ ...prop, source: 'underdog', isRealLine: true });
+                }
+            });
+            console.log(`  ✅ Underdog: ${underdogResult.props.length} REAL props`);
+        }
+    } catch (e) {
+        console.log(`  ⚠️ Underdog unavailable: ${e.message}`);
+    }
+
     // SOURCE 2: Bolt Odds - Live player props with real lines
     try {
         const boltOddsResult = await fetchBoltOddsProps(sport);
@@ -8102,6 +8120,205 @@ async function fetchPrizePicksProps(sport) {
         console.error(`❌ PrizePicks API error: ${error.message}`);
         return { props: [], source: 'prizepicks', error: error.message, count: 0 };
     }
+}
+
+// =====================================================
+// UNDERDOG FANTASY API - Alternative props source
+// Public API with no authentication required
+// =====================================================
+async function fetchUnderdogFantasyProps(sport) {
+    const cacheKey = `underdog_${sport}`;
+    if (propsCache[cacheKey] && (Date.now() - propsCache[cacheKey].timestamp < PROPS_CACHE_TTL_MS)) {
+        console.log(`📦 Returning cached Underdog props for ${sport}`);
+        return propsCache[cacheKey].data;
+    }
+
+    // Map our sport names to Underdog sport_id
+    const sportIdMap = {
+        'ncaab': 'CBB',
+        'nba': 'NBA',
+        'nfl': 'NFL',
+        'nhl': 'NHL',
+        'mlb': 'MLB',
+        'ncaaf': 'CFB'
+    };
+
+    const targetSportId = sportIdMap[sport];
+    if (!targetSportId) {
+        return { props: [], source: 'underdog', count: 0 };
+    }
+
+    try {
+        console.log(`🐕 Fetching Underdog Fantasy props for ${sport.toUpperCase()}...`);
+
+        const apiUrl = 'https://api.underdogfantasy.com/beta/v3/over_under_lines';
+
+        const response = await fetchWithHeaders(apiUrl, {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        });
+
+        if (!response) {
+            console.log('⚠️ No data from Underdog API');
+            return { props: [], source: 'underdog', count: 0 };
+        }
+
+        const games = response.games || [];
+        const lines = response.over_under_lines || [];
+        const players = response.players || [];
+        const appearances = response.appearances || [];
+
+        // Build lookups
+        const playerLookup = {};
+        players.forEach(p => {
+            playerLookup[p.id] = {
+                name: `${p.first_name} ${p.last_name}`,
+                team: p.team_abbrev || '',
+                position: p.position_id || '',
+                image: p.image_url
+            };
+        });
+
+        const gameLookup = {};
+        games.forEach(g => {
+            gameLookup[g.id] = g;
+        });
+
+        const appearanceLookup = {};
+        appearances.forEach(a => {
+            appearanceLookup[a.id] = a;
+        });
+
+        // Filter games for our target sport
+        const sportGames = games.filter(g => g.sport_id === targetSportId);
+        const sportGameIds = new Set(sportGames.map(g => g.id));
+
+        // Process lines
+        const sportProps = [];
+
+        for (const line of lines) {
+            // Skip if not a player prop
+            const overUnder = line.over_under;
+            if (!overUnder || overUnder.category !== 'player_prop') continue;
+
+            // Get the appearance stat info
+            const statInfo = overUnder.appearance_stat;
+            if (!statInfo) continue;
+
+            // Find the appearance to get player and match
+            const appearanceId = statInfo.appearance_id;
+            const appearance = appearanceLookup[appearanceId];
+            if (!appearance) continue;
+
+            // Check if this game is for our sport
+            const matchId = appearance.match_id;
+            if (!sportGameIds.has(matchId)) continue;
+
+            // Get player info
+            const playerId = appearance.player_id;
+            const player = playerLookup[playerId];
+            if (!player || !player.name) continue;
+
+            // Skip injured players
+            if (isPlayerInjured(player.name)) continue;
+
+            // Get line value
+            const lineValue = parseFloat(line.stat_value);
+            if (isNaN(lineValue) || lineValue <= 0) continue;
+
+            // Normalize stat type
+            const statType = normalizeUnderdogStatType(statInfo.display_stat || statInfo.stat);
+
+            // Get game info
+            const game = gameLookup[matchId];
+            const gameTitle = game ? game.short_title : '';
+            const gameTime = game ? game.scheduled_at : null;
+
+            // Calculate AI pick
+            const aiResult = calculateSmartAIPick(lineValue * 1.02, lineValue, 'NEUTRAL', player.position, statType);
+
+            sportProps.push({
+                player: player.name,
+                team: player.team,
+                position: player.position,
+                headshot: player.image,
+                propType: statType,
+                line: lineValue,
+                seasonAvg: (lineValue * 1.02).toFixed(1),
+                over: { underdog: -112, draftkings: -110, fanduel: -110 },
+                under: { underdog: -112, draftkings: -110, fanduel: -110 },
+                aiPick: aiResult.pick,
+                confidence: aiResult.confidence,
+                reasoning: `Underdog line: ${lineValue} ${statType}`,
+                trend: aiResult.trend,
+                game: gameTitle,
+                gameTime: gameTime,
+                source: 'underdog',
+                isRealLine: true,
+                lastUpdated: new Date().toISOString()
+            });
+        }
+
+        // Sort by game time
+        sportProps.sort((a, b) => {
+            if (a.gameTime && b.gameTime) {
+                return new Date(a.gameTime) - new Date(b.gameTime);
+            }
+            return 0;
+        });
+
+        const result = {
+            props: sportProps,
+            source: 'underdog',
+            count: sportProps.length
+        };
+
+        propsCache[cacheKey] = { data: result, timestamp: Date.now() };
+        console.log(`✅ Underdog: ${sportProps.length} ${sport.toUpperCase()} props fetched`);
+
+        return result;
+
+    } catch (error) {
+        console.error(`❌ Underdog API error: ${error.message}`);
+        return { props: [], source: 'underdog', error: error.message, count: 0 };
+    }
+}
+
+// Normalize Underdog stat types to our standard format
+function normalizeUnderdogStatType(statType) {
+    if (!statType) return 'Points';
+
+    const mappings = {
+        'Points': 'Points',
+        'Rebounds': 'Rebounds',
+        'Assists': 'Assists',
+        'Pts + Rebs + Asts': 'Pts+Rebs+Asts',
+        'Pts + Rebs': 'Pts+Rebs',
+        'Pts + Asts': 'Pts+Asts',
+        'Rebs + Asts': 'Rebs+Asts',
+        '3-Pointers Made': '3-Pointers',
+        'Steals': 'Steals',
+        'Blocks': 'Blocks',
+        'Turnovers': 'Turnovers',
+        'Fantasy Score': 'Fantasy Points',
+        // NFL
+        'Passing Yards': 'Passing Yards',
+        'Rushing Yards': 'Rushing Yards',
+        'Receiving Yards': 'Receiving Yards',
+        'Passing TDs': 'Passing TDs',
+        'Rushing TDs': 'Rushing TDs',
+        'Receptions': 'Receptions',
+        // NHL
+        'Goals': 'Goals',
+        'Shots': 'Shots',
+        'Saves': 'Saves',
+        // MLB
+        'Strikeouts': 'Strikeouts',
+        'Hits Allowed': 'Hits Allowed',
+        'Total Bases': 'Total Bases'
+    };
+
+    return mappings[statType] || statType;
 }
 
 // Normalize PrizePicks stat types to our standard format

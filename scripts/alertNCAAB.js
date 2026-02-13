@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
  * NCAAB Props Alert System
- * 
+ *
  * Monitors PrizePicks for CBB props and sends alerts via:
  * - Slack webhook
  * - Email (via local mail command)
  * - macOS notification
  * - Terminal bell
- * 
+ *
  * Configuration:
  *   Set environment variables or edit config below:
  *   - SLACK_WEBHOOK_URL: Your Slack incoming webhook URL
  *   - ALERT_EMAIL: Email address for notifications
- * 
+ *
  * Usage:
  *   node scripts/alertNCAAB.js                    # Check once and alert if props found
  *   node scripts/alertNCAAB.js --watch            # Continuous monitoring (every 5 min)
@@ -30,19 +30,19 @@ const { exec } = require('child_process');
 const CONFIG = {
     // Slack webhook URL (get from: https://api.slack.com/messaging/webhooks)
     slackWebhookUrl: process.env.SLACK_WEBHOOK_URL || '',
-    
+
     // Email for alerts (uses local mail command)
     alertEmail: process.env.ALERT_EMAIL || '',
-    
+
     // Enable/disable alert channels
     enableSlack: true,
     enableEmail: true,
     enableMacNotification: true,
     enableTerminalBell: true,
-    
+
     // PrizePicks CBB league ID
     prizePicksCBBUrl: 'https://api.prizepicks.com/projections?league_id=7',
-    
+
     // State file to track if we've already alerted
     stateFile: '/tmp/ncaab_props_alerted.txt'
 };
@@ -68,7 +68,7 @@ function log(msg, color = '') {
 // =====================================================
 
 function sendSlackAlert(message, propsCount) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         if (!CONFIG.slackWebhookUrl) {
             log('⚠️ Slack webhook not configured', COLORS.yellow);
             resolve(false);
@@ -182,7 +182,7 @@ BetGenius AI Alert System
 
         // Use macOS mail command
         const cmd = `echo "${body.replace(/"/g, '\\"')}" | mail -s "${subject}" ${CONFIG.alertEmail}`;
-        
+
         exec(cmd, (error) => {
             if (error) {
                 log(`⚠️ Email failed (mail command not available): ${error.message}`, COLORS.yellow);
@@ -203,7 +203,7 @@ function sendMacNotification(title, message) {
         }
 
         const script = `display notification "${message.replace(/"/g, '\\"')}" with title "${title}" sound name "Glass"`;
-        
+
         exec(`osascript -e '${script}'`, (error) => {
             if (error) {
                 log(`⚠️ macOS notification failed: ${error.message}`, COLORS.yellow);
@@ -230,7 +230,7 @@ function playTerminalBell() {
 function fetchJSON(url) {
     return new Promise((resolve, reject) => {
         const options = {
-            headers: { 
+            headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
             }
         };
@@ -252,11 +252,11 @@ async function checkPrizePicks() {
     try {
         const data = await fetchJSON(CONFIG.prizePicksCBBUrl);
         const projections = data.data || [];
-        
+
         if (projections.length === 0) {
             return { available: false, count: 0, props: [] };
         }
-        
+
         const props = projections.slice(0, 10).map(p => {
             const attrs = p.attributes || {};
             return {
@@ -266,7 +266,7 @@ async function checkPrizePicks() {
                 team: attrs.team_name || 'Unknown'
             };
         });
-        
+
         return { available: true, count: projections.length, props };
     } catch (e) {
         return { available: false, error: e.message, count: 0, props: [] };
@@ -317,21 +317,21 @@ function resetAlertState() {
 // =====================================================
 
 async function sendAllAlerts(propsCount, props) {
-    const propsMessage = props.slice(0, 5).map(p => 
+    const propsMessage = props.slice(0, 5).map(p =>
         `• ${p.player} (${p.team}): ${p.line} ${p.stat}`
     ).join('\n');
-    
+
     const message = `Sample props:\n${propsMessage}\n\n...and ${Math.max(0, propsCount - 5)} more!`;
-    
+
     // Send all alerts in parallel
     const results = await Promise.all([
         sendSlackAlert(message, propsCount),
         sendEmailAlert(message, propsCount),
         sendMacNotification('🏀 NCAAB Props Available!', `${propsCount} CBB props just released!`)
     ]);
-    
+
     playTerminalBell();
-    
+
     return results.some(r => r);
 }
 
@@ -339,46 +339,46 @@ async function runCheck() {
     console.log('\n' + '═'.repeat(60));
     log('🏀 NCAAB PROPS ALERT CHECK', COLORS.bold + COLORS.cyan);
     console.log('═'.repeat(60) + '\n');
-    
+
     // Check PrizePicks
     log('Checking PrizePicks CBB...', COLORS.blue);
     const pp = await checkPrizePicks();
-    
+
     if (pp.error) {
         log(`❌ Error: ${pp.error}`, COLORS.red);
         return { alerted: false };
     }
-    
+
     if (!pp.available) {
         log('⏳ No CBB props yet', COLORS.yellow);
         console.log('   Props typically release 1-3 hours before tip-off\n');
         return { alerted: false };
     }
-    
+
     // Props are available!
     log(`🎉 ${pp.count} CBB PROPS AVAILABLE!`, COLORS.bold + COLORS.green);
-    
+
     console.log(`\n${COLORS.green}Sample props:${COLORS.reset}`);
     pp.props.slice(0, 8).forEach(p => {
         console.log(`  • ${p.player} (${p.team}): ${p.line} ${p.stat}`);
     });
-    
+
     // Check if we've already alerted today
     if (hasAlreadyAlerted()) {
         log('\n✅ Already sent alerts today (skipping duplicate)', COLORS.yellow);
         return { alerted: false, alreadySent: true };
     }
-    
+
     // Send alerts
     console.log(`\n${COLORS.cyan}Sending alerts...${COLORS.reset}`);
     const alertSent = await sendAllAlerts(pp.count, pp.props);
-    
+
     if (alertSent) {
         markAsAlerted();
     }
-    
+
     console.log('─'.repeat(60) + '\n');
-    
+
     return { alerted: alertSent, propsCount: pp.count };
 }
 
@@ -387,24 +387,24 @@ async function runWatchMode(intervalMin = 5) {
     log('🏀 NCAAB PROPS ALERT - WATCH MODE', COLORS.bold + COLORS.cyan);
     log(`   Checking every ${intervalMin} minutes. Press Ctrl+C to stop.`, COLORS.cyan);
     console.log('═'.repeat(60) + '\n');
-    
+
     // Show configuration status
     console.log(`${COLORS.blue}Alert Configuration:${COLORS.reset}`);
     console.log(`  Slack: ${CONFIG.slackWebhookUrl ? '✅ Configured' : '❌ Not configured'}`);
     console.log(`  Email: ${CONFIG.alertEmail ? '✅ ' + CONFIG.alertEmail : '❌ Not configured'}`);
     console.log(`  macOS: ✅ Enabled`);
     console.log(`  Bell:  ✅ Enabled\n`);
-    
+
     const check = async () => {
         const result = await runCheck();
-        
+
         if (result.alerted) {
             console.log('\n' + '🎉'.repeat(20));
             log('ALERTS SENT! CBB props are now available!', COLORS.bold + COLORS.green);
             console.log('🎉'.repeat(20) + '\n');
         }
     };
-    
+
     await check();
     setInterval(check, intervalMin * 60 * 1000);
 }
@@ -413,32 +413,32 @@ async function testAlerts() {
     console.log('\n' + '═'.repeat(60));
     log('🧪 TESTING ALERT CHANNELS', COLORS.bold + COLORS.cyan);
     console.log('═'.repeat(60) + '\n');
-    
+
     const testProps = [
         { player: 'Test Player 1', team: 'Wisconsin', line: '18.5', stat: 'Points' },
         { player: 'Test Player 2', team: 'Michigan State', line: '6.5', stat: 'Rebounds' },
         { player: 'Test Player 3', team: 'Loyola', line: '4.5', stat: 'Assists' }
     ];
-    
+
     console.log(`${COLORS.blue}Testing all alert channels...${COLORS.reset}\n`);
-    
+
     // Test Slack
     console.log('1. Testing Slack webhook...');
     await sendSlackAlert('This is a test alert from BetGenius AI', 42);
-    
+
     // Test Email
     console.log('\n2. Testing Email...');
     await sendEmailAlert('This is a test alert from BetGenius AI', 42);
-    
+
     // Test macOS notification
     console.log('\n3. Testing macOS notification...');
     await sendMacNotification('🧪 Test Alert', 'This is a test notification from BetGenius AI');
-    
+
     // Test terminal bell
     console.log('\n4. Testing terminal bell...');
     playTerminalBell();
     log('Bell played!', COLORS.green);
-    
+
     console.log('\n' + '─'.repeat(60));
     console.log(`${COLORS.green}Test complete! Check each channel for notifications.${COLORS.reset}\n`);
 }
