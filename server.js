@@ -9477,6 +9477,27 @@ async function getGeneratedProps(sport) {
             };
             const sportPath = sportPaths[sport];
 
+            // NCAAF: Power 5 + Independents + Notable Group of 5 teams only
+            // This significantly reduces the number of teams to process
+            const NCAAF_PRIORITY_TEAMS = new Set([
+                // SEC (16 teams)
+                'ALA', 'ARK', 'AUB', 'FLA', 'UGA', 'UK', 'LSU', 'MSST',
+                'MIZ', 'OU', 'MISS', 'SC', 'TENN', 'TEX', 'TA&M', 'VAN',
+                // Big Ten (18 teams)
+                'ILL', 'IND', 'IOWA', 'MD', 'MICH', 'MSU', 'MINN', 'NEB',
+                'NW', 'OSU', 'ORE', 'PSU', 'PUR', 'RUTG', 'UCLA', 'USC', 'WASH', 'WIS',
+                // Big 12 (16 teams)
+                'ARIZ', 'ASU', 'BAY', 'BYU', 'UCF', 'CIN', 'COLO', 'HOU',
+                'ISU', 'KU', 'KSU', 'OKST', 'TCU', 'TTU', 'UTAH', 'WVU',
+                // ACC (17 teams)
+                'BC', 'CLEM', 'DUKE', 'FSU', 'GT', 'LOU', 'MIA', 'NCST',
+                'UNC', 'ND', 'PITT', 'SMU', 'STAN', 'SYR', 'UVA', 'VT', 'WAKE',
+                // Independents
+                'ARMY', 'NAVY', 'UMASS', 'CONN',
+                // Notable Group of 5
+                'BSU', 'MEM', 'TUL', 'LIB', 'UNLV', 'SDSU', 'JVST', 'APP', 'MTSU'
+            ]);
+
             // Get today's games first
             const scoresUrl = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/scoreboard?limit=50`;
             const scoresData = await fetchJSON(scoresUrl);
@@ -9491,7 +9512,7 @@ async function getGeneratedProps(sport) {
                 };
             }
 
-            console.log(`🏀 Found ${scoresData.events.length} ${sport.toUpperCase()} games today, fetching rosters...`);
+            console.log(`🏈 Found ${scoresData.events.length} ${sport.toUpperCase()} games today`);
 
             // Get unique team IDs from today's games
             const teamIds = new Set();
@@ -9501,6 +9522,12 @@ async function getGeneratedProps(sport) {
                 for (const comp of competitors) {
                     const team = comp.team;
                     if (team?.id) {
+                        // For NCAAF: Only include Power 5 + priority teams
+                        if (sport === 'ncaaf') {
+                            if (!NCAAF_PRIORITY_TEAMS.has(team.abbreviation)) {
+                                continue; // Skip non-priority teams
+                            }
+                        }
                         teamIds.add(team.id);
                         teamsInfo[team.id] = {
                             id: team.id,
@@ -9512,7 +9539,7 @@ async function getGeneratedProps(sport) {
                 }
             }
 
-            console.log(`📋 Fetching rosters for ${teamIds.size} teams playing today...`);
+            console.log(`📋 Processing ${teamIds.size} ${sport === 'ncaaf' ? 'Power 5/notable' : ''} teams playing today...`);
 
             // Fetch rosters only for teams playing today (max 20 to avoid timeout)
             const players = [];
