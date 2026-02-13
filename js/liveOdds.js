@@ -10,12 +10,38 @@ class LiveOddsFetcher {
         this.cache = new Map();
         this.cacheExpiry = 2 * 60 * 1000; // 2 minutes
         this.lastFetch = null;
+        this.lastFetchDate = null; // Track which date we fetched
         this.todaysGames = new Map(); // Store today's games by sport
         this.teamsPlayingToday = new Map(); // Teams playing today by sport
 
         // Sports currently in season (February 2026)
-        this.activeSports = ['nba', 'nhl', 'ncaab', 'soccer', 'mma'];
+        this.activeSports = ['nba', 'nhl', 'ncaab'];
         this.offseasonSports = ['nfl', 'mlb', 'ncaaf'];
+    }
+
+    // =====================================================
+    // Check if we need to refresh (new day or cache expired)
+    // =====================================================
+    needsRefresh() {
+        const today = new Date().toDateString();
+
+        // If it's a new day, force refresh
+        if (this.lastFetchDate !== today) {
+            console.log('📅 New day detected - refreshing schedule...');
+            return true;
+        }
+
+        // If cache expired (2 minutes), refresh
+        if (this.lastFetch && (Date.now() - this.lastFetch > this.cacheExpiry)) {
+            return true;
+        }
+
+        // If no data, refresh
+        if (this.todaysGames.size === 0) {
+            return true;
+        }
+
+        return false;
     }
 
     // =====================================================
@@ -29,6 +55,10 @@ class LiveOddsFetcher {
         );
 
         await Promise.allSettled(schedulePromises);
+
+        // Update cache timestamps
+        this.lastFetch = Date.now();
+        this.lastFetchDate = new Date().toDateString();
 
         // Log summary
         let totalGames = 0;
@@ -273,6 +303,12 @@ class EnhancedPropsService {
     // Get props - filtered to TODAY's games only
     // =====================================================
     async getProps(sport = 'all') {
+        // Check if we need to refresh the schedule (new day or cache expired)
+        if (this.liveOddsFetcher.needsRefresh()) {
+            console.log('🔄 Refreshing schedule...');
+            await this.initialize();
+        }
+
         // Ensure schedule is loaded
         if (!this.scheduleLoaded) {
             await this.initialize();

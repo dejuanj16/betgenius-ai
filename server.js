@@ -9468,6 +9468,22 @@ async function getGeneratedProps(sport) {
         }
     }
 
+    // NCAAF: Also handle offseason (season is Aug-Jan)
+    if (sport === 'ncaaf') {
+        const month = new Date().getMonth(); // 0-indexed
+        // NCAAF season: August (7) through January (0)
+        const isNCAAFSeason = month >= 7 || month <= 0;
+        if (!isNCAAFSeason) {
+            console.log(`🏈 NCAAF Offseason - No games scheduled`);
+            return {
+                source: 'ncaaf_offseason',
+                propsCount: 0,
+                props: [],
+                note: 'College Football Offseason - Season runs August through January. Check back then!'
+            };
+        }
+    }
+
     // COLLEGE SPORTS: Special handling - only fetch rosters for teams playing today
     if (sport === 'ncaab' || sport === 'ncaaf') {
         try {
