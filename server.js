@@ -924,12 +924,47 @@ async function fetchTodaysGames(sport) {
     }
 }
 
+// Normalize team abbreviations (handles differences between APIs)
+const TEAM_ABBR_ALIASES = {
+    'UTAH': 'UTA',
+    'UTA': 'UTA',
+    'PHO': 'PHX',
+    'PHX': 'PHX',
+    'GS': 'GSW',
+    'GSW': 'GSW',
+    'SA': 'SAS',
+    'SAS': 'SAS',
+    'NY': 'NYK',
+    'NYK': 'NYK',
+    'NO': 'NOP',
+    'NOP': 'NOP',
+    'NOLA': 'NOP',
+    'WSH': 'WAS',
+    'WAS': 'WAS',
+    'BK': 'BKN',
+    'BKN': 'BKN',
+    'BRK': 'BKN'
+};
+
+function normalizeTeamAbbr(abbr) {
+    if (!abbr) return null;
+    const upper = abbr.toUpperCase();
+    return TEAM_ABBR_ALIASES[upper] || upper;
+}
+
 // Check if a team's game is completed (team should be filtered out)
 function isTeamGameCompleted(teamAbbr, sport) {
     if (!teamAbbr || !sport) return false;
     const completedTeams = COMPLETED_TEAMS_CACHE[sport];
     if (!completedTeams || completedTeams.size === 0) return false;
-    return completedTeams.has(teamAbbr.toUpperCase());
+    const normalizedAbbr = normalizeTeamAbbr(teamAbbr);
+    // Check both original and normalized abbreviations
+    for (const completed of completedTeams) {
+        if (normalizeTeamAbbr(completed) === normalizedAbbr) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Filter out props for teams whose games are completed
@@ -939,16 +974,23 @@ function filterCompletedGameProps(props, sport) {
     const completedTeams = COMPLETED_TEAMS_CACHE[sport];
     if (!completedTeams || completedTeams.size === 0) return props;
 
+    // Normalize completed teams for comparison
+    const normalizedCompleted = new Set();
+    for (const team of completedTeams) {
+        normalizedCompleted.add(normalizeTeamAbbr(team));
+    }
+
     const beforeCount = props.length;
     const filteredProps = props.filter(prop => {
-        const teamAbbr = prop.team?.toUpperCase();
+        const teamAbbr = prop.team;
         if (!teamAbbr) return true; // Keep props without team info
-        return !completedTeams.has(teamAbbr);
+        const normalized = normalizeTeamAbbr(teamAbbr);
+        return !normalizedCompleted.has(normalized);
     });
 
     const removedCount = beforeCount - filteredProps.length;
     if (removedCount > 0) {
-        console.log(`🏁 Filtered out ${removedCount} props for completed games (${completedTeams.size} teams finished)`);
+        console.log(`🏁 Filtered out ${removedCount} props for completed games (${completedTeams.size} teams finished: ${Array.from(completedTeams).join(', ')})`);
     }
 
     return filteredProps;
