@@ -13,6 +13,7 @@ class LiveOddsFetcher {
         this.lastFetchDate = null; // Track which date we fetched
         this.todaysGames = new Map(); // Store today's games by sport
         this.teamsPlayingToday = new Map(); // Teams playing today by sport
+        this.completedTeams = new Map(); // Teams whose games are FINAL (should be filtered out)
 
         // Sports currently in season (February 2026)
         this.activeSports = ['nba', 'nhl', 'ncaab'];
@@ -114,6 +115,7 @@ class LiveOddsFetcher {
     // =====================================================
     parseSchedule(data, sport) {
         const games = [];
+        const completedTeamsForSport = new Set();
 
         if (!data.events) return games;
 
@@ -129,47 +131,67 @@ class LiveOddsFetcher {
 
                 const status = competition.status?.type?.name || 'scheduled';
                 const isLive = status === 'in_progress' || status === 'STATUS_IN_PROGRESS';
-                const isCompleted = status === 'final' || status === 'STATUS_FINAL';
+                const isCompleted = status === 'final' || status === 'STATUS_FINAL' ||
+                                   status === 'postponed' || status === 'STATUS_POSTPONED';
+
+                // Track completed teams for filtering
+                if (isCompleted) {
+                    if (homeTeam.team?.abbreviation) {
+                        completedTeamsForSport.add(homeTeam.team.abbreviation.toUpperCase());
+                    }
+                    if (awayTeam.team?.abbreviation) {
+                        completedTeamsForSport.add(awayTeam.team.abbreviation.toUpperCase());
+                    }
+                }
 
                 // Get odds
                 const odds = competition.odds?.[0] || {};
 
-                games.push({
-                    id: event.id,
-                    sport: sport,
-                    name: event.name,
-                    shortName: event.shortName,
-                    startTime: new Date(event.date),
-                    status: status,
-                    isLive: isLive,
-                    isCompleted: isCompleted,
-                    venue: competition.venue?.fullName || '',
-                    broadcast: competition.broadcasts?.[0]?.names?.[0] || '',
-                    homeTeam: {
-                        name: homeTeam.team?.displayName || homeTeam.team?.name,
-                        abbreviation: homeTeam.team?.abbreviation,
-                        logo: homeTeam.team?.logo,
-                        score: parseInt(homeTeam.score) || 0,
-                        record: homeTeam.records?.[0]?.summary || ''
-                    },
-                    awayTeam: {
-                        name: awayTeam.team?.displayName || awayTeam.team?.name,
-                        abbreviation: awayTeam.team?.abbreviation,
-                        logo: awayTeam.team?.logo,
-                        score: parseInt(awayTeam.score) || 0,
-                        record: awayTeam.records?.[0]?.summary || ''
-                    },
-                    odds: {
-                        spread: parseFloat(odds.spread) || 0,
-                        total: parseFloat(odds.overUnder) || 0,
-                        homeMoneyline: parseInt(odds.homeTeamOdds?.moneyLine) || 0,
-                        awayMoneyline: parseInt(odds.awayTeamOdds?.moneyLine) || 0,
-                        provider: odds.provider?.name || 'ESPN BET'
-                    }
-                });
+                // Only include non-completed games
+                if (!isCompleted) {
+                    games.push({
+                        id: event.id,
+                        sport: sport,
+                        name: event.name,
+                        shortName: event.shortName,
+                        startTime: new Date(event.date),
+                        status: status,
+                        isLive: isLive,
+                        isCompleted: isCompleted,
+                        venue: competition.venue?.fullName || '',
+                        broadcast: competition.broadcasts?.[0]?.names?.[0] || '',
+                        homeTeam: {
+                            name: homeTeam.team?.displayName || homeTeam.team?.name,
+                            abbreviation: homeTeam.team?.abbreviation,
+                            logo: homeTeam.team?.logo,
+                            score: parseInt(homeTeam.score) || 0,
+                            record: homeTeam.records?.[0]?.summary || ''
+                        },
+                        awayTeam: {
+                            name: awayTeam.team?.displayName || awayTeam.team?.name,
+                            abbreviation: awayTeam.team?.abbreviation,
+                            logo: awayTeam.team?.logo,
+                            score: parseInt(awayTeam.score) || 0,
+                            record: awayTeam.records?.[0]?.summary || ''
+                        },
+                        odds: {
+                            spread: parseFloat(odds.spread) || 0,
+                            total: parseFloat(odds.overUnder) || 0,
+                            homeMoneyline: parseInt(odds.homeTeamOdds?.moneyLine) || 0,
+                            awayMoneyline: parseInt(odds.awayTeamOdds?.moneyLine) || 0,
+                            provider: odds.provider?.name || 'ESPN BET'
+                        }
+                    });
+                }
             } catch (e) {
                 console.warn('Error parsing game:', e);
             }
+        }
+
+        // Store completed teams for this sport
+        this.completedTeams.set(sport, completedTeamsForSport);
+        if (completedTeamsForSport.size > 0) {
+            console.log(`🏁 ${sport.toUpperCase()}: ${completedTeamsForSport.size} teams with completed games filtered out`);
         }
 
         return games;

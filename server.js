@@ -804,10 +804,16 @@ async function refreshAllProps() {
 
     for (const sport of activeSports) {
         try {
+            // Refresh today's games first to update completed teams
+            await fetchTodaysGames(sport);
+
             const props = await fetchLivePropsFromAllSources(sport);
             if (props && props.length > 0) {
                 // Enrich props with accurate team data
-                const enrichedProps = props.map(prop => enrichPropWithTeamData(prop, sport));
+                let enrichedProps = props.map(prop => enrichPropWithTeamData(prop, sport));
+
+                // Filter out props for teams whose games are completed/FINAL
+                enrichedProps = filterCompletedGameProps(enrichedProps, sport);
 
                 livePropsStore[sport] = {
                     props: enrichedProps,
@@ -828,7 +834,19 @@ const TODAYS_GAMES_CACHE = {
     nba: { games: [], lastUpdated: null },
     nfl: { games: [], lastUpdated: null },
     nhl: { games: [], lastUpdated: null },
-    mlb: { games: [], lastUpdated: null }
+    mlb: { games: [], lastUpdated: null },
+    ncaab: { games: [], lastUpdated: null },
+    ncaaf: { games: [], lastUpdated: null }
+};
+
+// Track which teams have completed games (should be filtered out)
+const COMPLETED_TEAMS_CACHE = {
+    nba: new Set(),
+    nfl: new Set(),
+    nhl: new Set(),
+    mlb: new Set(),
+    ncaab: new Set(),
+    ncaaf: new Set()
 };
 
 // Fetch today's games for opponent matchup info
@@ -838,7 +856,9 @@ async function fetchTodaysGames(sport) {
             nfl: 'football/nfl',
             nba: 'basketball/nba',
             nhl: 'hockey/nhl',
-            mlb: 'baseball/mlb'
+            mlb: 'baseball/mlb',
+            ncaab: 'basketball/mens-college-basketball',
+            ncaaf: 'football/college-football'
         };
 
         const sportPath = sportPaths[sport];
@@ -849,33 +869,89 @@ async function fetchTodaysGames(sport) {
 
         if (!data?.events) return [];
 
-        const games = data.events.map(event => {
+        const games = [];
+        const completedTeams = new Set();
+
+        for (const event of data.events) {
             const competition = event.competitions?.[0];
             const home = competition?.competitors?.find(c => c.homeAway === 'home');
             const away = competition?.competitors?.find(c => c.homeAway === 'away');
 
-            return {
-                id: event.id,
-                name: event.name,
-                date: event.date,
-                status: event.status?.type?.name,
-                homeTeam: home?.team?.abbreviation,
-                homeTeamFull: home?.team?.displayName,
-                awayTeam: away?.team?.abbreviation,
-                awayTeamFull: away?.team?.displayName
-            };
-        });
+            const status = event.status?.type?.name || 'scheduled';
+            const isCompleted = status === 'STATUS_FINAL' || status === 'final' ||
+                               status === 'STATUS_POSTPONED' || status === 'postponed';
+
+            const homeTeam = home?.team?.abbreviation;
+            const awayTeam = away?.team?.abbreviation;
+
+            // Track completed teams
+            if (isCompleted) {
+                if (homeTeam) completedTeams.add(homeTeam);
+                if (awayTeam) completedTeams.add(awayTeam);
+            }
+
+            // Only include non-completed games
+            if (!isCompleted) {
+                games.push({
+                    id: event.id,
+                    name: event.name,
+                    date: event.date,
+                    status: status,
+                    isCompleted: false,
+                    homeTeam: homeTeam,
+                    homeTeamFull: home?.team?.displayName,
+                    awayTeam: awayTeam,
+                    awayTeamFull: away?.team?.displayName
+                });
+            }
+        }
 
         TODAYS_GAMES_CACHE[sport] = {
             games: games,
             lastUpdated: new Date().toISOString()
         };
 
+        COMPLETED_TEAMS_CACHE[sport] = completedTeams;
+
+        if (completedTeams.size > 0) {
+            console.log(`🏁 ${sport.toUpperCase()}: ${completedTeams.size} teams with completed games filtered out`);
+        }
+
         return games;
     } catch (error) {
         console.error(`Error fetching today's games:`, error.message);
         return [];
     }
+}
+
+// Check if a team's game is completed (team should be filtered out)
+function isTeamGameCompleted(teamAbbr, sport) {
+    if (!teamAbbr || !sport) return false;
+    const completedTeams = COMPLETED_TEAMS_CACHE[sport];
+    if (!completedTeams || completedTeams.size === 0) return false;
+    return completedTeams.has(teamAbbr.toUpperCase());
+}
+
+// Filter out props for teams whose games are completed
+function filterCompletedGameProps(props, sport) {
+    if (!props || props.length === 0) return props;
+
+    const completedTeams = COMPLETED_TEAMS_CACHE[sport];
+    if (!completedTeams || completedTeams.size === 0) return props;
+
+    const beforeCount = props.length;
+    const filteredProps = props.filter(prop => {
+        const teamAbbr = prop.team?.toUpperCase();
+        if (!teamAbbr) return true; // Keep props without team info
+        return !completedTeams.has(teamAbbr);
+    });
+
+    const removedCount = beforeCount - filteredProps.length;
+    if (removedCount > 0) {
+        console.log(`🏁 Filtered out ${removedCount} props for completed games (${completedTeams.size} teams finished)`);
+    }
+
+    return filteredProps;
 }
 
 // Get opponent for a team from today's games
@@ -2344,6 +2420,10 @@ const server = http.createServer(async (req, res) => {
 
                 // Enrich each prop with team and opponent data
                 data.props = data.props.map(prop => enrichPropWithTeamData(prop, sport));
+
+                // Filter out props for teams whose games are completed/FINAL
+                data.props = filterCompletedGameProps(data.props, sport);
+
                 data.propsCount = data.props.length;
             }
 
