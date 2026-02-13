@@ -43,16 +43,45 @@ node scripts/testNHLFilter.js --monitor --interval=60
 
 ---
 
-## NBA Filter Test - ~February 17, 2026
+## NBA Filter Test - February 17, 2026
 
-**Purpose:** Test filtering when NBA resumes after All-Star Weekend
+**Purpose:** Test completed games filtering when NBA resumes after All-Star Weekend
 
-**Status:** NBA All-Star Weekend is Feb 14-16, 2026. Regular season resumes ~Feb 17.
+**Why this date:** NBA All-Star Weekend is Feb 14-16, 2026. Regular season resumes Feb 17.
+
+### All-Star Weekend Schedule
+- **Feb 14 (Fri):** Rising Stars Game
+- **Feb 15 (Sat):** Skills/3PT/Dunk Contest  
+- **Feb 16 (Sun):** All-Star Game
+- **Feb 17 (Mon):** Regular season resumes! ⬅️
+
+### Test Commands
 
 ```bash
-# Use the general monitoring script
-node scripts/monitorProps.js nba --watch
+# Full test suite (run on Feb 17 or later)
+node scripts/testNBAFilter.js
+
+# Quick status check
+node scripts/testNBAFilter.js --check
+
+# Monitor mode (watch games go FINAL in real-time)
+node scripts/testNBAFilter.js --monitor
+
+# Custom interval (every 60 seconds)
+node scripts/testNBAFilter.js --monitor --interval=60
 ```
+
+### What the test verifies
+
+1. ✅ All-Star Weekend detection clears when regular games return
+2. ✅ NBA props are being served (PrizePicks + generated)
+3. ✅ When a game goes FINAL, props for those teams are filtered out
+4. ✅ Team abbreviation normalization works (e.g., GS/GSW, PHO/PHX)
+
+### Expected Results
+
+- **PASS:** 0 props from completed teams after games go FINAL
+- **FAIL:** Props found for teams whose games are completed
 
 ---
 

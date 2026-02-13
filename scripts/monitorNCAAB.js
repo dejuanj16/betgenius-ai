@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * NCAAB Props Monitor - February 13, 2026
- * 
+ *
  * Monitors PrizePicks for CBB (College Basketball) props before tonight's games.
- * 
+ *
  * Tonight's Games:
  *   - Michigan State @ Wisconsin - 8:00 PM EST
- *   - Saint Louis @ Loyola Chicago - 8:30 PM EST  
+ *   - Saint Louis @ Loyola Chicago - 8:30 PM EST
  *   - Ohio @ Miami (OH) - 9:00 PM EST
- * 
+ *
  * Usage:
  *   node scripts/monitorNCAAB.js              # Check once
  *   node scripts/monitorNCAAB.js --watch      # Monitor every 15 min
@@ -45,7 +45,7 @@ function log(msg, color = '') {
 function fetchJSON(url) {
     return new Promise((resolve, reject) => {
         const options = {
-            headers: { 
+            headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
             }
         };
@@ -67,11 +67,11 @@ async function checkPrizePicks() {
     try {
         const data = await fetchJSON(PRIZEPICKS_CBB_URL);
         const projections = data.data || [];
-        
+
         if (projections.length === 0) {
             return { available: false, count: 0, props: [] };
         }
-        
+
         // Parse props
         const props = projections.map(p => {
             const attrs = p.attributes || {};
@@ -82,16 +82,16 @@ async function checkPrizePicks() {
                 team: attrs.team_name || 'Unknown'
             };
         });
-        
+
         // Check for tonight's games
         const tonightTeams = TONIGHT_GAMES.flatMap(g => [g.away.toLowerCase(), g.home.toLowerCase()]);
-        const tonightProps = props.filter(p => 
+        const tonightProps = props.filter(p =>
             tonightTeams.some(team => (p.team || '').toLowerCase().includes(team))
         );
-        
-        return { 
-            available: true, 
-            count: projections.length, 
+
+        return {
+            available: true,
+            count: projections.length,
             props: props,
             tonightProps: tonightProps
         };
@@ -117,29 +117,29 @@ async function runCheck() {
     console.log('\n' + '═'.repeat(65));
     log('🏀 NCAAB PROPS MONITOR', COLORS.bold + COLORS.cyan);
     console.log('═'.repeat(65));
-    
+
     // Show tonight's games
     console.log(`\n${COLORS.yellow}Tonight's Games:${COLORS.reset}`);
     TONIGHT_GAMES.forEach(g => {
         console.log(`  🏀 ${g.away} @ ${g.home} - ${g.time}`);
     });
-    
+
     // Check PrizePicks
     console.log(`\n${COLORS.blue}Checking PrizePicks CBB...${COLORS.reset}`);
     const pp = await checkPrizePicks();
-    
+
     if (pp.error) {
         log(`❌ PrizePicks Error: ${pp.error}`, COLORS.red);
     } else if (pp.available) {
         log(`✅ PrizePicks CBB Props: ${pp.count} available!`, COLORS.green);
-        
+
         if (pp.tonightProps && pp.tonightProps.length > 0) {
             console.log(`\n${COLORS.green}Props for Tonight's Games:${COLORS.reset}`);
             pp.tonightProps.slice(0, 10).forEach(p => {
                 console.log(`  • ${p.player} (${p.team}): ${p.line} ${p.stat}`);
             });
         }
-        
+
         console.log(`\n${COLORS.cyan}Sample Props:${COLORS.reset}`);
         pp.props.slice(0, 8).forEach(p => {
             console.log(`  • ${p.player}: ${p.line} ${p.stat}`);
@@ -148,11 +148,11 @@ async function runCheck() {
         log(`⏳ No CBB props yet - PrizePicks hasn't released them`, COLORS.yellow);
         console.log(`   Props typically release 1-3 hours before tip-off`);
     }
-    
+
     // Check BetGenius API
     console.log(`\n${COLORS.blue}Checking BetGenius API...${COLORS.reset}`);
     const bg = await checkBetGeniusAPI();
-    
+
     if (bg.error) {
         log(`❌ BetGenius Error: ${bg.error}`, COLORS.red);
     } else {
@@ -162,20 +162,20 @@ async function runCheck() {
             console.log(`  Note: ${bg.note}`);
         }
     }
-    
+
     // Time until first game
     const now = new Date();
     const firstGame = new Date('2026-02-14T01:00:00Z'); // 8 PM EST = 01:00 UTC next day
     const hoursUntil = (firstGame - now) / (1000 * 60 * 60);
-    
+
     console.log(`\n${COLORS.magenta}⏰ Time until first tip-off: ${hoursUntil.toFixed(1)} hours${COLORS.reset}`);
-    
+
     if (hoursUntil <= 3 && !pp.available) {
         log(`⚠️ Props usually release by now - keep monitoring!`, COLORS.yellow);
     }
-    
+
     console.log('─'.repeat(65) + '\n');
-    
+
     return { prizepicks: pp, betgenius: bg };
 }
 
@@ -184,23 +184,23 @@ async function runWatchMode(intervalMin = 15) {
     log(`🏀 NCAAB PROPS MONITOR - WATCH MODE`, COLORS.bold + COLORS.cyan);
     log(`   Checking every ${intervalMin} minutes. Press Ctrl+C to stop.`, COLORS.cyan);
     console.log('═'.repeat(65));
-    
+
     let propsFound = false;
-    
+
     const check = async () => {
         const result = await runCheck();
-        
+
         if (result.prizepicks.available && !propsFound) {
             propsFound = true;
             console.log('\n' + '🎉'.repeat(20));
             log(`CBB PROPS ARE NOW AVAILABLE! ${result.prizepicks.count} props found!`, COLORS.bold + COLORS.green);
             console.log('🎉'.repeat(20) + '\n');
-            
+
             // Play alert sound (terminal bell)
             process.stdout.write('\x07');
         }
     };
-    
+
     await check();
     setInterval(check, intervalMin * 60 * 1000);
 }
