@@ -956,31 +956,31 @@ async function checkSpecialEvents(sport) {
         nfl: 'football/nfl',
         mlb: 'baseball/mlb'
     };
-    
+
     const sportPath = sportPaths[sport];
     if (!sportPath) return null;
-    
+
     try {
         const url = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/scoreboard`;
         const data = await fetchJSON(url);
-        
+
         if (!data?.events) return null;
-        
+
         const today = new Date();
-        
+
         // NBA All-Star Weekend Check
         if (sport === 'nba') {
             const isAllStarEvent = data.events.some(event => {
                 const name = (event.name || '').toLowerCase();
                 const homeName = event.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home')?.team?.displayName?.toLowerCase() || '';
                 const awayName = event.competitions?.[0]?.competitors?.find(c => c.homeAway === 'away')?.team?.displayName?.toLowerCase() || '';
-                
+
                 return name.includes('all-star') || name.includes('rising stars') ||
                        name.includes('celebrity') || name.includes('skills') ||
                        homeName.includes('team') || awayName.includes('team') ||
                        homeName.includes('world') || awayName.includes('world');
             });
-            
+
             if (isAllStarEvent) {
                 console.log(`🌟 NBA All-Star Weekend detected`);
                 return {
@@ -992,7 +992,7 @@ async function checkSpecialEvents(sport) {
                 };
             }
         }
-        
+
         // NHL Olympic Break Check
         if (sport === 'nhl') {
             // Check if next game is far in the future (Olympic break)
@@ -1000,11 +1000,11 @@ async function checkSpecialEvents(sport) {
                 const gameDate = new Date(e.date);
                 return gameDate > today;
             });
-            
+
             if (futureGames.length > 0) {
                 const nextGame = new Date(futureGames[0].date);
                 const daysUntilNextGame = Math.ceil((nextGame - today) / (1000 * 60 * 60 * 24));
-                
+
                 if (daysUntilNextGame > 5) {
                     const resumeDate = nextGame.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
                     console.log(`🏒 NHL Olympic Break - Next game in ${daysUntilNextGame} days (${resumeDate})`);
@@ -1019,7 +1019,7 @@ async function checkSpecialEvents(sport) {
                 }
             }
         }
-        
+
         return null; // No special event
     } catch (e) {
         console.log(`⚠️ Special event check error: ${e.message}`);
@@ -9801,149 +9801,31 @@ async function getGeneratedProps(sport) {
         }
     }
 
-    // COLLEGE SPORTS: Special handling - only fetch rosters for teams playing today
-    if (sport === 'ncaab' || sport === 'ncaaf') {
-        try {
-            const sportPaths = {
-                ncaab: 'basketball/mens-college-basketball',
-                ncaaf: 'football/college-football'
-            };
-            const sportPath = sportPaths[sport];
-
-            // NCAAF: Power 5 + Independents + Notable Group of 5 teams only
-            // This significantly reduces the number of teams to process
-            const NCAAF_PRIORITY_TEAMS = new Set([
-                // SEC (16 teams)
-                'ALA', 'ARK', 'AUB', 'FLA', 'UGA', 'UK', 'LSU', 'MSST',
-                'MIZ', 'OU', 'MISS', 'SC', 'TENN', 'TEX', 'TA&M', 'VAN',
-                // Big Ten (18 teams)
-                'ILL', 'IND', 'IOWA', 'MD', 'MICH', 'MSU', 'MINN', 'NEB',
-                'NW', 'OSU', 'ORE', 'PSU', 'PUR', 'RUTG', 'UCLA', 'USC', 'WASH', 'WIS',
-                // Big 12 (16 teams)
-                'ARIZ', 'ASU', 'BAY', 'BYU', 'UCF', 'CIN', 'COLO', 'HOU',
-                'ISU', 'KU', 'KSU', 'OKST', 'TCU', 'TTU', 'UTAH', 'WVU',
-                // ACC (17 teams)
-                'BC', 'CLEM', 'DUKE', 'FSU', 'GT', 'LOU', 'MIA', 'NCST',
-                'UNC', 'ND', 'PITT', 'SMU', 'STAN', 'SYR', 'UVA', 'VT', 'WAKE',
-                // Independents
-                'ARMY', 'NAVY', 'UMASS', 'CONN',
-                // Notable Group of 5
-                'BSU', 'MEM', 'TUL', 'LIB', 'UNLV', 'SDSU', 'JVST', 'APP', 'MTSU'
-            ]);
-
-            // Get today's games first
-            const scoresUrl = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/scoreboard?limit=50`;
-            const scoresData = await fetchJSON(scoresUrl);
-
-            if (!scoresData?.events || scoresData.events.length === 0) {
-                console.log(`📅 No ${sport.toUpperCase()} games today`);
-                return {
-                    source: `${sport}_no_games`,
-                    propsCount: 0,
-                    props: [],
-                    note: `No ${sport.toUpperCase()} games scheduled for today`
-                };
-            }
-
-            console.log(`🏈 Found ${scoresData.events.length} ${sport.toUpperCase()} games today`);
-
-            // Get unique team IDs from today's games
-            const teamIds = new Set();
-            const teamsInfo = {};
-            for (const event of scoresData.events) {
-                const competitors = event.competitions?.[0]?.competitors || [];
-                for (const comp of competitors) {
-                    const team = comp.team;
-                    if (team?.id) {
-                        // For NCAAF: Only include Power 5 + priority teams
-                        if (sport === 'ncaaf') {
-                            if (!NCAAF_PRIORITY_TEAMS.has(team.abbreviation)) {
-                                continue; // Skip non-priority teams
-                            }
-                        }
-                        teamIds.add(team.id);
-                        teamsInfo[team.id] = {
-                            id: team.id,
-                            name: team.displayName,
-                            abbreviation: team.abbreviation,
-                            logo: team.logo
-                        };
-                    }
-                }
-            }
-
-            console.log(`📋 Processing ${teamIds.size} ${sport === 'ncaaf' ? 'Power 5/notable' : ''} teams playing today...`);
-
-            // Fetch rosters only for teams playing today (max 20 to avoid timeout)
-            const players = [];
-            const teamIdsArray = Array.from(teamIds).slice(0, 20);
-
-            for (const teamId of teamIdsArray) {
-                try {
-                    const rosterUrl = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/teams/${teamId}/roster`;
-                    const rosterData = await fetchJSON(rosterUrl);
-
-                    let athleteList = [];
-                    if (Array.isArray(rosterData.athletes)) {
-                        if (rosterData.athletes[0]?.displayName || rosterData.athletes[0]?.fullName) {
-                            athleteList = rosterData.athletes;
-                        } else if (rosterData.athletes[0]?.items || rosterData.athletes[0]?.athletes) {
-                            rosterData.athletes.forEach(group => {
-                                const groupPlayers = group.items || group.athletes || [];
-                                athleteList = athleteList.concat(groupPlayers);
-                            });
-                        }
-                    }
-
-                    const teamInfo = teamsInfo[teamId] || {};
-                    athleteList.slice(0, 5).forEach(player => { // Top 5 players per team
-                        if (player.displayName || player.fullName) {
-                            players.push({
-                                id: player.id,
-                                name: player.displayName || player.fullName,
-                                team: teamInfo.abbreviation,
-                                fullTeam: teamInfo.name,
-                                position: player.position?.abbreviation || player.position?.name || 'G/F',
-                                headshot: player.headshot?.href
-                            });
-                        }
-                    });
-                } catch (e) {
-                    // Skip teams with roster errors
-                }
-            }
-
-            if (players.length > 0) {
-                console.log(`✅ Found ${players.length} players from ${sport.toUpperCase()} teams playing today`);
-
-                // Generate props from these players
-                const estimatedStats = players.slice(0, 50).map(player => ({
-                    playerId: player.id,
-                    playerName: player.name,
-                    team: player.team,
-                    fullTeam: player.fullTeam,
-                    position: player.position,
-                    headshot: player.headshot,
-                    ...getEstimatedStats(sport, player.position)
-                }));
-
-                const props = generatePropsFromStats(estimatedStats, sport);
-                const result = {
-                    source: `${sport}_generated`,
-                    propsCount: props.length,
-                    props: props,
-                    note: `Props for ${sport.toUpperCase()} teams playing today`
-                };
-                propsCache[cacheKey] = { data: result, timestamp: Date.now() };
-                console.log(`✅ Generated ${props.length} ${sport.toUpperCase()} props`);
-                return result;
-            }
-        } catch (e) {
-            console.log(`⚠️ ${sport.toUpperCase()} props generation failed: ${e.message}`);
-        }
+    // COLLEGE SPORTS: Only use REAL data from PrizePicks - NO GENERATED/GUESSED PROPS
+    // We don't guess - we only show accurate props from real sportsbook data
+    if (sport === 'ncaab') {
+        console.log(`🏀 NCAAB: Only showing real props from PrizePicks (no estimates)`);
+        // PrizePicks CBB props should be fetched earlier in the flow
+        // If we reach here, no real props were available
+        return {
+            source: 'ncaab_no_real_data',
+            propsCount: 0,
+            props: [],
+            note: '🏀 No NCAAB props available. We only show real sportsbook lines - check back closer to game time when PrizePicks releases CBB props!'
+        };
     }
 
-    // For other sports, generate from ESPN roster data
+    if (sport === 'ncaaf') {
+        console.log(`🏈 NCAAF: Only showing real props from PrizePicks (no estimates)`);
+        return {
+            source: 'ncaaf_no_real_data',
+            propsCount: 0,
+            props: [],
+            note: '🏈 No NCAAF props available. We only show real sportsbook lines - check back closer to game time when props are released!'
+        };
+    }
+
+    // For other sports (non-college), use ESPN roster data as fallback
     const playerData = await fetchPlayerStats(sport);
     if (playerData.players && playerData.players.length > 0) {
         // Create estimated stats for players (since ESPN doesn't give season avgs directly)
