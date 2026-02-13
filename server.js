@@ -1020,6 +1020,36 @@ async function checkSpecialEvents(sport) {
             }
         }
 
+        // MLB Offseason Check (season typically runs April - October)
+        if (sport === 'mlb') {
+            const month = today.getMonth(); // 0-indexed: 0=Jan, 1=Feb, etc.
+
+            // MLB offseason: November through March (months 10, 11, 0, 1, 2)
+            // Spring Training starts mid-February but real props not available until Opening Day
+            if (month >= 10 || month <= 2) {
+                console.log(`⚾ MLB Offseason - Regular season starts late March`);
+                return {
+                    source: 'mlb_offseason',
+                    propsCount: 0,
+                    props: [],
+                    note: '⚾ MLB Offseason! Regular season starts late March. We only show real sportsbook lines - check back when Opening Day approaches!',
+                    specialEvent: 'offseason'
+                };
+            }
+
+            // Also check if there are no games scheduled for today
+            if (data.events.length === 0) {
+                console.log(`⚾ MLB - No games scheduled today`);
+                return {
+                    source: 'mlb_no_games',
+                    propsCount: 0,
+                    props: [],
+                    note: '⚾ No MLB games scheduled today. Check back on game days for real props!',
+                    specialEvent: 'no_games'
+                };
+            }
+        }
+
         return null; // No special event
     } catch (e) {
         console.log(`⚠️ Special event check error: ${e.message}`);
@@ -9822,6 +9852,18 @@ async function getGeneratedProps(sport) {
             propsCount: 0,
             props: [],
             note: '🏈 No NCAAF props available. We only show real sportsbook lines - check back closer to game time when props are released!'
+        };
+    }
+
+    // MLB: Only use REAL data from sportsbooks during regular season
+    // checkSpecialEvents handles offseason, but this is a fallback
+    if (sport === 'mlb') {
+        console.log(`⚾ MLB: Only showing real props from sportsbooks (no estimates)`);
+        return {
+            source: 'mlb_no_real_data',
+            propsCount: 0,
+            props: [],
+            note: '⚾ No MLB props available. We only show real sportsbook lines - check back closer to game time when props are released!'
         };
     }
 
