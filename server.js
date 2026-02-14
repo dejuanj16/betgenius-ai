@@ -2559,6 +2559,24 @@ const server = http.createServer(async (req, res) => {
                 }
             }
 
+            // Try Underdog Fantasy (backup - no rate limiting)
+            if (!data || !data.props?.length) {
+                try {
+                    const underdogData = await fetchUnderdogFantasyProps(sport);
+                    if (underdogData.props && underdogData.props.length > 0) {
+                        console.log(`✅ Using ${underdogData.props.length} REAL Underdog Fantasy props`);
+                        const filteredProps = filterInjuredPlayers(underdogData.props);
+                        data = {
+                            props: filteredProps,
+                            source: 'underdog',
+                            isRealLine: true
+                        };
+                    }
+                } catch (e) {
+                    console.log(`⚠️ Underdog Fantasy failed: ${e.message}`);
+                }
+            }
+
             // Try DraftKings if no PrizePicks data
             if (!data || !data.props?.length) {
                 try {
